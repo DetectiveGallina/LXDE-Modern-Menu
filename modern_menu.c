@@ -1,8 +1,8 @@
-/* modern_menu_fixed.c
- * Modern Menu Plugin for LXPanel (corregido)
- * Based on lxpanel-plugin-example structure
+/* modern_menu.c
+ * Modern Menu Plugin for LXPanel
+ * Based on lxpanel-plugin-example from zeppel13 https://github.com/zeppel13/lxpanel-plugin-example
  */
-
+#define _GNU_SOURCE
 #include <lxpanel/plugin.h>
 #include <gtk/gtk.h>
 #include <glib.h>
@@ -21,6 +21,7 @@
 
 /* Plugin structure */
 typedef struct {
+    GtkWidget *icon;   // la imagen real dentro del botón
     GtkWidget *window;
     GtkWidget *search;
     GtkWidget *categories;
@@ -1163,43 +1164,61 @@ static void update_button_icon(ModernMenu *m)
 {
     if (!m || !m->plugin_button) return;
 
-    GtkWidget *image = NULL;
-    GdkPixbuf *pix = NULL;
+    // Si no existe el GtkImage, créalo
+    if (!m->icon) {
+        m->icon = gtk_image_new();
+        gtk_container_add(GTK_CONTAINER(m->plugin_button), m->icon);
+    }
 
-    int icon_size = panel_get_icon_size(m->panel); // tamaño estándar del panel
-
-    // Intenta cargar el ícono personalizado o el por defecto
+    int icon_size = panel_get_icon_size(m->panel);
     const char *icon_name = (m->icon_path && *m->icon_path) ? m->icon_path : "start-here";
 
-    // Intenta cargar el ícono como nombre de tema (más coherente con el resto)
-    pix = gtk_icon_theme_load_icon(gtk_icon_theme_get_default(),
+    GdkPixbuf *pix = NULL;
+
+    // 1) Intentar cargar desde el tema
+    pix = gtk_icon_theme_load_icon(
+        gtk_icon_theme_get_default(),
                                    icon_name,
                                    icon_size,
                                    GTK_ICON_LOOKUP_USE_BUILTIN,
-                                   NULL);
+                                   NULL
+    );
 
-    // Si no existe en el tema, intenta cargarlo desde archivo
-    if (!pix && g_file_test(icon_name, G_FILE_TEST_EXISTS))
+    // 2) Si no está en el tema, cargar desde archivo
+    if (!pix && g_file_test(icon_name, G_FILE_TEST_EXISTS)) {
         pix = gdk_pixbuf_new_from_file_at_size(icon_name, icon_size, icon_size, NULL);
+    }
 
-    // Si aún no hay ícono, crea uno genérico
-    if (!pix)
-        pix = gtk_icon_theme_load_icon(gtk_icon_theme_get_default(),
+    // 3) Fallback final
+    if (!pix) {
+        pix = gtk_icon_theme_load_icon(
+            gtk_icon_theme_get_default(),
                                        "application-x-executable",
                                        icon_size,
                                        GTK_ICON_LOOKUP_USE_BUILTIN,
-                                       NULL);
-
-    if (pix) {
-        image = gtk_image_new_from_pixbuf(pix);
-        g_object_unref(pix);
-    } else {
-        image = gtk_image_new_from_icon_name("application-x-executable", GTK_ICON_SIZE_BUTTON);
+                                       NULL
+        );
     }
 
-    gtk_button_set_image(GTK_BUTTON(m->plugin_button), image);
-    gtk_widget_show(image);
+    // Asignar al GtkImage del plugin
+    if (pix) {
+        gtk_image_set_from_pixbuf(GTK_IMAGE(m->icon), pix);
+        g_object_unref(pix);
+    }
+
+    gtk_widget_show_all(m->plugin_button);
 }
+
+static gboolean on_plugin_button_press(GtkWidget *widget, GdkEventButton *event, gpointer user_data)
+{
+    // Solo abrís tu menú con el clic izquierdo
+    if (event->button == 1) {
+        show_or_hide_menu(widget, user_data);
+        return TRUE; // consumido
+    }
+    return FALSE;
+}
+
 
 /* ==== CONSTRUCTOR PRINCIPAL DEL PLUGIN MODERN MENU ==== */
 GtkWidget *modernmenu_constructor(LXPanel *panel, config_setting_t *settings)
@@ -1225,21 +1244,23 @@ GtkWidget *modernmenu_constructor(LXPanel *panel, config_setting_t *settings)
     /* ==== CREAR CONTENEDOR PRINCIPAL DEL PLUGIN EN EL PANEL ==== */
     // 'p' es el widget que se mostrará en el panel de LXDE
     GtkWidget *p = gtk_event_box_new();
-    gtk_widget_set_has_window(p, FALSE);
+    gtk_widget_set_has_window(p, TRUE);
+    g_signal_connect(p, "button-press-event", G_CALLBACK(on_plugin_button_press), m);
     gtk_container_set_border_width(GTK_CONTAINER(p), 0);
 
     /* ==== BOTÓN DEL MENÚ (ICONO EN EL PANEL) ==== */
     // Este botón abre o cierra la ventana del menú
-    GtkWidget *button = gtk_button_new();
-    m->plugin_button = button;
-    gtk_button_set_relief(GTK_BUTTON(button), GTK_RELIEF_NONE);
-    gtk_container_set_border_width(GTK_CONTAINER(button), 0);
+    GtkWidget *image = gtk_image_new();
+    m->plugin_button = p;   // EL BOTÓN ES EL EVENTBOX, NO EL GTKIMAGE
 
-    // Actualiza el icono y agrega tooltip
+    m->icon = image;        // guardamos la imagen real aquí
+
+
     update_button_icon(m);
-    gtk_widget_set_tooltip_text(button, "Menú de aplicaciones");
-    gtk_container_add(GTK_CONTAINER(p), button);
-    gtk_widget_show_all(p);
+    gtk_widget_set_tooltip_text(p, "Menú de aplicaciones");
+
+    gtk_container_add(GTK_CONTAINER(p), image);
+    gtk_widget_show(image);
 
     /* ==== CREAR LA VENTANA POPUP DEL MENÚ ==== */
     // Es una ventana sin bordes, tipo menú emergente
@@ -1354,7 +1375,6 @@ GtkWidget *modernmenu_constructor(LXPanel *panel, config_setting_t *settings)
 
     /* ==== CONEXIONES DE SEÑALES ==== */
     g_signal_connect(m->search, "changed", G_CALLBACK(on_search_changed), m);
-    g_signal_connect(button, "clicked", G_CALLBACK(show_or_hide_menu), m);
     g_signal_connect(m->window, "key-press-event", G_CALLBACK(on_window_key_press), m);
     g_signal_connect(m->window, "focus-out-event", G_CALLBACK(on_window_focus_out), m);
 
