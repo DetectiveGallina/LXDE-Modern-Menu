@@ -15,7 +15,7 @@ El objetivo de este proyecto es añadir a LXDE un menú con una apariencia más 
 
 ## Instalación
 
-Cloná el repositorio:
+Clonar el repositorio con:
 
 ```bash
 git clone https://github.com/tuusuario/LXDE-Modern-Menu.git
