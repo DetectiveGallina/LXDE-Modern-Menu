@@ -61,6 +61,6 @@ make install
 make run
 ```
 
-**`make install`** copiará automaticamente el plugin a "/usr/lib/x86-64-linux-gnu/lxpanel/plugins", aseguresé de revisar la ubicación de la carpeta /lxpanel/plugins en su sistema. Una vez la encuentre modifique el archivo Makefile con la ruta correcta.
+**`make install`** copiará automaticamente el plugin a "/usr/lib/x86-64-linux-gnu/lxpanel/plugins", aseguresé de revisar la ubicación de la carpeta /lxpanel/plugins en su sistema. Una vez la encuentre modifique el archivo Makefile con la ruta correcta. Alternativamente, puede ejecutar el comando con el agregado de **`INSTALL_DIR=`** y la ruta que corresponda en su sistema
 
 **`make run`** reiniciará lxpanel para que detecte el plugin correctamente. A veces por ejecutarlo muchas veces termina crasheando la sesión y debe de ejecutar lxsession otra vez para que funcione.
