@@ -10,6 +10,7 @@ El objetivo de este proyecto es añadir a LXDE un menú con una apariencia más 
 - Un **panel de aplicaciones** con íconos a la derecha.  
 - Una **barra de búsqueda** integrada.  
 - Un **botón de salida** que ejecuta el comando lxsession-logout de LXDE.
+- Una **lista de ocultas** para ocultar aquellas aplicaciones que no querés borrar pero tampoco ver.
 
 ---
 
@@ -37,7 +38,8 @@ También puede usar el comando **`make install`** el cual se explica más abajo 
 Al hacer **clic derecho** sobre una aplicación en el menú, se abrirá un menú contextual con las siguientes opciones:
 
 * **Agregar a favoritos** / **Quitar de favoritos** (si ya está agregado)
-* **Añadir al escritorio** (si no lo está ya)
+* **Ocultar aplicación**
+* **Agregar al escritorio** (si no lo está ya)
 * **Eliminar**
 * **Preferencias**
 
