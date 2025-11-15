@@ -1,8 +1,9 @@
-/* modern_menu.c
- * Modern Menu Plugin for LXPanel
- * Based on lxpanel-plugin-example from zeppel13 https://github.com/zeppel13/lxpanel-plugin-example
+/* modern_menu_fixed.c
+ * Modern Menu Plugin for LXPanel (corregido)
+ * Based on lxpanel-plugin-example structure
  */
 #define _GNU_SOURCE
+
 #include <lxpanel/plugin.h>
 #include <gtk/gtk.h>
 #include <glib.h>
@@ -17,11 +18,12 @@
 
 #ifndef _
 #define _(String) (String)
+#define APPS_PER_ROW 3  // Cantidad máxima de aplicaciones que se van a mostrar por fila
 #endif
 
 /* Plugin structure */
 typedef struct {
-    GtkWidget *icon;   // la imagen real dentro del botón
+    GtkWidget *icon;
     GtkWidget *window;
     GtkWidget *search;
     GtkWidget *categories;
@@ -34,14 +36,15 @@ typedef struct {
     GtkListStore *cat_store;
     LXPanel *panel;
     GtkWidget *plugin_button;
-    GSList *all_apps;
-    GSList *favorites;
+    GSList *all_apps;     // Lista de todas las apps
+    GSList *favorites;    // Lista apps favoritas
     gchar *favorites_path;
     gchar *icon_path;
     config_setting_t *settings;
     gboolean suppress_hide;
     GtkWidget *btn_fav;
     gboolean switching_category;
+    GSList *hidden_apps;  // Lista apps ocultas
 } ModernMenu;
 
 enum {
@@ -55,43 +58,49 @@ static void hide_menu(ModernMenu *m);
 static void populate_apps_for_dir(ModernMenu *m, MenuCacheDir *dir);
 static void show_favorites_category(GtkWidget *widget, gpointer user_data);
 static GdkPixbuf *get_app_icon(MenuCacheItem *item, int size);
-/* Launch application - CORREGIDO */
+
+/* Launch application */
 static void launch_app_from_item(GtkWidget *button, gpointer user_data)
 {
     MenuCacheItem *item = (MenuCacheItem *) user_data;
     ModernMenu *m = g_object_get_data(G_OBJECT(button), "modern-menu");
-
     if (!item) {
         g_warning("No hay MenuCacheItem asociado al botón");
         return;
     }
 
-    const gchar *desktop_id = menu_cache_item_get_id(item);
-    if (!desktop_id) {
-        g_warning("El item no tiene ID");
+    const gchar *desktop_path = menu_cache_item_get_file_path(item);
+    if (!desktop_path) {
+        g_warning("No se pudo obtener el archivo .desktop del ítem");
         return;
     }
+    g_print("Intentando lanzar: %s\n", desktop_path);
 
-    g_print("Intentando lanzar: %s\n", desktop_id);
-
-    GDesktopAppInfo *dinfo = g_desktop_app_info_new(desktop_id);
+    GDesktopAppInfo *dinfo = g_desktop_app_info_new_from_filename(desktop_path);
     if (dinfo) {
         GError *error = NULL;
 
-        if (!g_app_info_launch(G_APP_INFO(dinfo), NULL, NULL, &error)) {
-            g_warning("Error al lanzar '%s': %s", desktop_id, error->message);
+        // Crear contexto de lanzamiento para GTK+2
+        GdkScreen *screen = gtk_widget_get_screen(button);
+        GdkAppLaunchContext *context = gdk_app_launch_context_new();
+        gdk_app_launch_context_set_screen(context, screen);
+        gdk_app_launch_context_set_timestamp(context, gtk_get_current_event_time());
+
+        if (!g_app_info_launch(G_APP_INFO(dinfo), NULL, G_APP_LAUNCH_CONTEXT(context), &error)) {
+            g_warning("Error al lanzar '%s': %s", desktop_path, error->message);
             g_clear_error(&error);
         } else {
             g_print("Aplicación lanzada exitosamente\n");
         }
 
+        g_object_unref(context);
         g_object_unref(dinfo);
 
         if (m) {
             hide_menu(m);
         }
     } else {
-        g_warning("No se pudo crear GDesktopAppInfo desde '%s'", desktop_id);
+        g_warning("No se pudo crear GDesktopAppInfo desde archivo '%s'", desktop_path);
     }
 }
 
@@ -469,7 +478,95 @@ static void show_properties(GtkMenuItem *menuitem, gpointer user_data)
         g_spawn_command_line_async(cmd, NULL);
         g_free(cmd);
     } else {
-        show_error_dialog("Editar propiedades no está disponible. Tal vez deba intantar instalar lxshortcut o libfm-tools");
+        show_error_dialog("Editar propiedades no está disponible. Tal vez deba intentar instalar lxshortcut o libfm-tools");
+    }
+}
+/* ===== FUNCIONES PARA GESTIONAR APLICACIONES OCULTAS ===== */
+
+/* Cargar lista de apps ocultas desde archivo */
+static void load_hidden_apps(ModernMenu *m)
+{
+    if (m->hidden_apps) {
+        g_slist_free_full(m->hidden_apps, g_free);
+        m->hidden_apps = NULL;
+    }
+
+    const char *home = g_get_home_dir();
+    gchar *hidden_file = g_build_filename(home, ".config", "modernmenu", "hidden.list", NULL);
+
+    FILE *f = fopen(hidden_file, "r");
+    if (f) {
+        char line[512];
+        while (fgets(line, sizeof(line), f)) {
+            g_strstrip(line);
+            if (*line && *line != '#') {
+                m->hidden_apps = g_slist_prepend(m->hidden_apps, g_strdup(line));
+            }
+        }
+        fclose(f);
+    }
+    g_free(hidden_file);
+}
+
+/* Guardar lista de apps ocultas */
+static void save_hidden_apps(ModernMenu *m)
+{
+    const char *home = g_get_home_dir();
+    gchar *config_dir = g_build_filename(home, ".config", "modernmenu", NULL);
+    g_mkdir_with_parents(config_dir, 0755);
+
+    gchar *hidden_file = g_build_filename(config_dir, "hidden.list", NULL);
+    FILE *f = fopen(hidden_file, "w");
+
+    if (f) {
+        fprintf(f, "# Hidden applications for Modern Menu\n");
+        for (GSList *l = m->hidden_apps; l; l = l->next) {
+            fprintf(f, "%s\n", (char *)l->data);
+        }
+        fclose(f);
+    }
+
+    g_free(hidden_file);
+    g_free(config_dir);
+}
+
+/* Verificar si una app está oculta */
+static gboolean is_hidden(ModernMenu *m, const char *app_id)
+{
+    if (!app_id || !m->hidden_apps) return FALSE;
+    return (g_slist_find_custom(m->hidden_apps, app_id, (GCompareFunc)g_strcmp0) != NULL);
+}
+
+/* Toggle hidden state */
+static void toggle_hidden(GtkMenuItem *item, gpointer user_data)
+{
+    GtkWidget *app_button = GTK_WIDGET(user_data);
+    MenuCacheItem *menu_item = g_object_get_data(G_OBJECT(app_button), "menu-item");
+    ModernMenu *m = g_object_get_data(G_OBJECT(app_button), "modern-menu");
+
+    if (!menu_item || !m) return;
+
+    const char *app_id = menu_cache_item_get_id(menu_item);
+    if (!app_id) return;
+
+    GSList *found = g_slist_find_custom(m->hidden_apps, app_id, (GCompareFunc)g_strcmp0);
+
+    if (found) {
+        // Mostrar
+        m->hidden_apps = g_slist_remove(m->hidden_apps, found->data);
+        g_free(found->data);
+    } else {
+        // Ocultar
+        m->hidden_apps = g_slist_prepend(m->hidden_apps, g_strdup(app_id));
+    }
+
+    save_hidden_apps(m);
+
+    // Refrescar la vista actual
+    if (m->current_dir) {
+        populate_apps_for_dir(m, m->current_dir);
+    } else {
+        show_favorites_category(NULL, m);
     }
 }
 
@@ -484,22 +581,27 @@ static void on_context_menu_done(GtkMenuShell *menu_shell, gpointer user_data)
         m->suppress_hide = FALSE;
 }
 
-/* Mostrar menú contextual sin ocultar la ventana principal */
+/* Mostrar menú contextual */
 static void show_context_menu(GtkWidget *app_button, ModernMenu *m, GdkEventButton *event)
 {
     if (!app_button || !m) return;
-
     GtkWidget *menu = gtk_menu_new();
-    /* Obtener el id desde el MenuCacheItem asociado al botón (más seguro) */
 
+    /* Obtener el id desde el MenuCacheItem asociado al botón */
     MenuCacheItem *item = g_object_get_data(G_OBJECT(app_button), "menu-item");
     const char *app_id = NULL;
     gboolean is_fav = FALSE;
+    gboolean is_hid = FALSE;
+
     if (item)
         app_id = menu_cache_item_get_id(item);
 
-    if (app_id && g_slist_find_custom(m->favorites, app_id, (GCompareFunc)g_strcmp0))
-        is_fav = TRUE;
+    if (app_id) {
+        if (g_slist_find_custom(m->favorites, app_id, (GCompareFunc)g_strcmp0))
+            is_fav = TRUE;
+        if (g_slist_find_custom(m->hidden_apps, app_id, (GCompareFunc)g_strcmp0))
+            is_hid = TRUE;
+    }
 
     /* ===== Agregar/Quitar de Favoritos ===== */
     GtkWidget *fav_item = gtk_menu_item_new_with_label(
@@ -508,6 +610,19 @@ static void show_context_menu(GtkWidget *app_button, ModernMenu *m, GdkEventButt
     gtk_menu_shell_append(GTK_MENU_SHELL(menu), fav_item);
     gtk_widget_show(fav_item);
     g_signal_connect(fav_item, "activate", G_CALLBACK(toggle_favorite), app_button);
+
+    /* ===== Ocultar/Mostrar aplicación ===== */
+    GtkWidget *hide_item = gtk_menu_item_new_with_label(
+        is_hid ? "Mostrar aplicación" : "Ocultar aplicación"
+    );
+    gtk_menu_shell_append(GTK_MENU_SHELL(menu), hide_item);
+    gtk_widget_show(hide_item);
+    g_signal_connect(hide_item, "activate", G_CALLBACK(toggle_hidden), app_button);
+
+    /* Separador */
+    GtkWidget *separator = gtk_separator_menu_item_new();
+    gtk_menu_shell_append(GTK_MENU_SHELL(menu), separator);
+    gtk_widget_show(separator);
 
     /* ===== Agregar al Escritorio ===== */
     const char *desktop_file = item ? menu_cache_item_get_file_path(item) : NULL;
@@ -533,12 +648,13 @@ static void show_context_menu(GtkWidget *app_button, ModernMenu *m, GdkEventButt
         g_free(dest_file);
         g_free(desktop_dir);
     }
+
     /* ==== ELIMINAR PAQUETE ==== */
     GtkWidget *remove_pkg_item = gtk_menu_item_new_with_label("Eliminar paquete");
     gtk_menu_shell_append(GTK_MENU_SHELL(menu), remove_pkg_item);
-    const char *desktop_path = NULL;
+    gtk_widget_show(remove_pkg_item);
 
-    /* Si estás usando MenuCacheItem (de libfm) */
+    const char *desktop_path = NULL;
     if (item)
         desktop_path = menu_cache_item_get_file_path(item);
 
@@ -552,13 +668,10 @@ static void show_context_menu(GtkWidget *app_button, ModernMenu *m, GdkEventButt
     g_signal_connect(prop_item, "activate", G_CALLBACK(show_properties), app_button);
 
     gtk_widget_show_all(menu);
-
-    m->suppress_hide = TRUE;  /* prevenimos cierres por focus-out */
+    m->suppress_hide = TRUE;
     g_signal_connect(menu, "selection-done", G_CALLBACK(on_context_menu_done), m);
-
     gtk_menu_popup(GTK_MENU(menu), NULL, NULL, NULL, NULL, event->button, event->time);
 }
-
 
 /* ==== MANEJADOR DE CLIC DERECHO ==== */
 static gboolean on_app_button_press(GtkWidget *widget, GdkEventButton *event, gpointer user_data)
@@ -569,6 +682,67 @@ static gboolean on_app_button_press(GtkWidget *widget, GdkEventButton *event, gp
         return TRUE;
     }
     return FALSE;
+}
+
+/* Callback cuando comienza el drag */
+static void on_app_drag_begin(GtkWidget *widget, GdkDragContext *context, gpointer user_data)
+{
+    MenuCacheItem *item = (MenuCacheItem *)g_object_get_data(G_OBJECT(widget), "menu-item");
+    if (!item) return;
+
+    // Obtener el icono de la app para mostrarlo mientras arrastrás
+    GdkPixbuf *pb = get_app_icon(item, 48);
+    if (pb) {
+        gtk_drag_set_icon_pixbuf(context, pb, 0, 0);
+        g_object_unref(pb);
+    }
+}
+
+/* Callback para proveer los datos del drag */
+static void on_app_drag_data_get(GtkWidget *widget, GdkDragContext *context,
+                                 GtkSelectionData *selection_data, guint info,
+                                 guint time, gpointer user_data)
+{
+    MenuCacheItem *item = (MenuCacheItem *)g_object_get_data(G_OBJECT(widget), "menu-item");
+    if (!item) return;
+
+    const char *desktop_path = menu_cache_item_get_file_path(item);
+    if (!desktop_path) return;
+
+    // Extraer solo el nombre del archivo .desktop
+    const char *filename = strrchr(desktop_path, '/');
+    if (filename) {
+        filename++; // saltar el '/'
+    } else {
+        filename = desktop_path;
+    }
+
+    // Obtener la categoría padre (si existe)
+    MenuCacheDir *parent = menu_cache_item_get_parent(item);
+    const char *category = "applications";
+
+    if (parent) {
+        const char *parent_name = menu_cache_item_get_name(MENU_CACHE_ITEM(parent));
+        if (parent_name) {
+            category = parent_name;
+        }
+    }
+
+    // Construir el string tipo "menu://applications/Office/libreoffice-startcenter.desktop"
+    gchar *menu_uri = g_strdup_printf("menu://applications/%s/%s", category, filename);
+
+    // Enviar los datos según el tipo solicitado
+    if (info == 0) { // text/uri-list
+        gchar *uri_list = g_strdup_printf("file://%s\r\n", desktop_path);
+        gtk_selection_data_set(selection_data,
+                               gtk_selection_data_get_target(selection_data),
+                               8, (const guchar *)uri_list, strlen(uri_list));
+        g_free(uri_list);
+    } else if (info == 1) { // text/plain
+        gtk_selection_data_set_text(selection_data, menu_uri, -1);
+    }
+
+    g_free(menu_uri);
 }
 
 /* Sección de favoritos */
@@ -621,10 +795,9 @@ static void show_favorites_category(GtkWidget *widget, gpointer user_data)
     for (GSList *l = m->all_apps; l; l = l->next) {
         MenuCacheItem *item = MENU_CACHE_ITEM(l->data);
         const char *id = menu_cache_item_get_id(item);
+        if (!is_favorite(m, id) || is_hidden(m, id)) continue;
 
-        if (!is_favorite(m, id)) continue;
-
-        if (count % 3 == 0 || current_hbox == NULL) {
+        if (count % APPS_PER_ROW == 0 || current_hbox == NULL) {
             current_hbox = gtk_hbox_new(TRUE, 8);
             gtk_box_pack_start(GTK_BOX(m->apps_box), current_hbox, FALSE, FALSE, 4);
             gtk_widget_show(current_hbox);
@@ -634,6 +807,21 @@ static void show_favorites_category(GtkWidget *widget, gpointer user_data)
         gtk_button_set_relief(GTK_BUTTON(btn), GTK_RELIEF_NONE);
         g_object_set_data(G_OBJECT(btn), "menu-item", item);
         g_object_set_data(G_OBJECT(btn), "modern-menu", m);
+
+        // ===== CONFIGURAR DRAG AND DROP =====
+        GtkTargetEntry targets[] = {
+            { "text/uri-list", 0, 0 },
+            { "text/plain", 0, 1 }
+        };
+
+        gtk_drag_source_set(btn,
+                            GDK_BUTTON1_MASK,
+                            targets, G_N_ELEMENTS(targets),
+                            GDK_ACTION_COPY);
+
+        g_signal_connect(btn, "drag-begin", G_CALLBACK(on_app_drag_begin), NULL);
+        g_signal_connect(btn, "drag-data-get", G_CALLBACK(on_app_drag_data_get), NULL);
+        // ===== FIN DRAG AND DROP =====
 
         GtkWidget *vbox = gtk_vbox_new(FALSE, 4);
         gtk_container_add(GTK_CONTAINER(btn), vbox);
@@ -671,6 +859,7 @@ static void show_favorites_category(GtkWidget *widget, gpointer user_data)
     /* Fin del modo de cambio */
     m->switching_category = FALSE;
 }
+
 
 static GdkPixbuf *get_app_icon(MenuCacheItem *item, int size)
 {
@@ -716,7 +905,6 @@ static GdkPixbuf *get_app_icon(MenuCacheItem *item, int size)
 static void populate_apps_for_dir(ModernMenu *m, MenuCacheDir *dir)
 {
     if (!m || !m->apps_box) return;
-
     m->current_dir = dir;
 
     GList *children = gtk_container_get_children(GTK_CONTAINER(m->apps_box));
@@ -749,9 +937,9 @@ static void populate_apps_for_dir(ModernMenu *m, MenuCacheDir *dir)
         if (menu_cache_item_get_type(item) != MENU_CACHE_TYPE_APP) continue;
 
         const char *id = menu_cache_item_get_id(item);
-        if (!id) continue;
+        if (!id || is_hidden(m, id)) continue;
 
-        if (count % 3 == 0 || current_hbox == NULL) {
+        if (count % APPS_PER_ROW == 0 || current_hbox == NULL) {
             current_hbox = gtk_hbox_new(TRUE, 8);
             gtk_box_pack_start(GTK_BOX(m->apps_box), current_hbox, FALSE, FALSE, 4);
             gtk_widget_show(current_hbox);
@@ -759,9 +947,23 @@ static void populate_apps_for_dir(ModernMenu *m, MenuCacheDir *dir)
 
         GtkWidget *btn = gtk_button_new();
         gtk_button_set_relief(GTK_BUTTON(btn), GTK_RELIEF_NONE);
-
         g_object_set_data(G_OBJECT(btn), "menu-item", item);
         g_object_set_data(G_OBJECT(btn), "modern-menu", m);
+
+        // ===== CONFIGURAR DRAG AND DROP =====
+        GtkTargetEntry targets[] = {
+            { "text/uri-list", 0, 0 },
+            { "text/plain", 0, 1 }
+        };
+
+        gtk_drag_source_set(btn,
+                            GDK_BUTTON1_MASK,
+                            targets, G_N_ELEMENTS(targets),
+                            GDK_ACTION_COPY);
+
+        g_signal_connect(btn, "drag-begin", G_CALLBACK(on_app_drag_begin), NULL);
+        g_signal_connect(btn, "drag-data-get", G_CALLBACK(on_app_drag_data_get), NULL);
+        // ===== FIN DRAG AND DROP =====
 
         GtkWidget *vbox = gtk_vbox_new(FALSE, 4);
         gtk_container_add(GTK_CONTAINER(btn), vbox);
@@ -773,7 +975,6 @@ static void populate_apps_for_dir(ModernMenu *m, MenuCacheDir *dir)
             gtk_image_set_pixel_size(GTK_IMAGE(img), 48);
             g_object_unref(pb);
         }
-
         gtk_misc_set_alignment(GTK_MISC(img), 0.5, 0.5);
         gtk_box_pack_start(GTK_BOX(vbox), img, FALSE, FALSE, 0);
 
@@ -784,9 +985,7 @@ static void populate_apps_for_dir(ModernMenu *m, MenuCacheDir *dir)
         gtk_misc_set_alignment(GTK_MISC(lbl), 0.5, 0.5);
         gtk_box_pack_start(GTK_BOX(vbox), lbl, FALSE, FALSE, 0);
 
-        // Tooltip con nombre completo
-        if (name)
-            gtk_widget_set_tooltip_text(btn, name);
+        if (name) gtk_widget_set_tooltip_text(btn, name);
 
         g_signal_connect(btn, "clicked", G_CALLBACK(launch_app_from_item), item);
         g_signal_connect(btn, "button-press-event", G_CALLBACK(on_app_button_press), m);
@@ -959,10 +1158,9 @@ static void on_search_changed(GtkEditable *entry, gpointer user_data)
         MenuCacheItem *item = MENU_CACHE_ITEM(l->data);
         const char *name = menu_cache_item_get_name(item);
         const char *id = menu_cache_item_get_id(item);
+        if (!name || !id || !strcasestr(name, text) || is_hidden(m, id)) continue;
 
-        if (!name || !id || !strcasestr(name, text)) continue;
-
-        if (count % 3 == 0 || current_hbox == NULL) {
+        if (count % APPS_PER_ROW == 0 || current_hbox == NULL) {
             current_hbox = gtk_hbox_new(TRUE, 8);
             gtk_box_pack_start(GTK_BOX(m->apps_box), current_hbox, FALSE, FALSE, 4);
             gtk_widget_show(current_hbox);
@@ -970,9 +1168,23 @@ static void on_search_changed(GtkEditable *entry, gpointer user_data)
 
         GtkWidget *btn = gtk_button_new();
         gtk_button_set_relief(GTK_BUTTON(btn), GTK_RELIEF_NONE);
-
         g_object_set_data(G_OBJECT(btn), "menu-item", item);
         g_object_set_data(G_OBJECT(btn), "modern-menu", m);
+
+        // ===== CONFIGURAR DRAG AND DROP =====
+        GtkTargetEntry targets[] = {
+            { "text/uri-list", 0, 0 },
+            { "text/plain", 0, 1 }
+        };
+
+        gtk_drag_source_set(btn,
+                            GDK_BUTTON1_MASK,
+                            targets, G_N_ELEMENTS(targets),
+                            GDK_ACTION_COPY);
+
+        g_signal_connect(btn, "drag-begin", G_CALLBACK(on_app_drag_begin), NULL);
+        g_signal_connect(btn, "drag-data-get", G_CALLBACK(on_app_drag_data_get), NULL);
+        // ===== FIN DRAG AND DROP =====
 
         GtkWidget *vbox = gtk_vbox_new(FALSE, 4);
         gtk_container_add(GTK_CONTAINER(btn), vbox);
@@ -984,7 +1196,6 @@ static void on_search_changed(GtkEditable *entry, gpointer user_data)
             gtk_image_set_pixel_size(GTK_IMAGE(img), 48);
             g_object_unref(pb);
         }
-
         gtk_misc_set_alignment(GTK_MISC(img), 0.5, 0.5);
         gtk_box_pack_start(GTK_BOX(vbox), img, FALSE, FALSE, 0);
 
@@ -999,13 +1210,12 @@ static void on_search_changed(GtkEditable *entry, gpointer user_data)
 
         gtk_widget_set_size_request(btn, 110, 100);
         gtk_widget_show_all(btn);
-
         gtk_box_pack_start(GTK_BOX(current_hbox), btn, FALSE, FALSE, 0);
         count++;
     }
 
     if (count == 0) {
-        GtkWidget *lbl = gtk_label_new("No matching applications");
+        GtkWidget *lbl = gtk_label_new("No se encontró aplicaciones que coincidan");
         gtk_misc_set_alignment(GTK_MISC(lbl), 0.5, 0.5);
         gtk_box_pack_start(GTK_BOX(m->apps_box), lbl, FALSE, FALSE, 4);
         gtk_widget_show(lbl);
@@ -1022,7 +1232,7 @@ static void run_command_async(const char *cmd, ModernMenu *m)
 static void on_logout_clicked(GtkButton *b, gpointer user_data)
 {
     (void)b;
-    run_command_async("lxsession-logout || i3-msg exit", user_data);
+    run_command_async("lxsession-logout", user_data);
 }
 
 static void position_window_near_button(ModernMenu *m)
@@ -1106,7 +1316,6 @@ static void show_or_hide_menu(GtkWidget *button, ModernMenu *m)
 {
     (void)button;
     if (!m) return;
-
     if (m->window_shown) {
         hide_menu(m);
     } else {
@@ -1118,7 +1327,6 @@ static void show_or_hide_menu(GtkWidget *button, ModernMenu *m)
         m->window_shown = TRUE;
     }
 }
-
 static void on_menu_cache_reload_real(MenuCache *cache, gpointer user_data)
 {
     (void)cache;
@@ -1146,6 +1354,11 @@ static void modern_menu_destructor(gpointer user_data)
         g_slist_free_full(m->all_apps, (GDestroyNotify)menu_cache_item_unref);
     }
 
+    if (m->hidden_apps) {
+        g_slist_free_full(m->hidden_apps, g_free);
+        m->hidden_apps = NULL;
+    }
+
     if (m->favorites) {
         g_slist_free_full(m->favorites, g_free);
     }
@@ -1167,7 +1380,16 @@ static void update_button_icon(ModernMenu *m)
     // Si no existe el GtkImage, créalo
     if (!m->icon) {
         m->icon = gtk_image_new();
-        gtk_container_add(GTK_CONTAINER(m->plugin_button), m->icon);
+
+        // IMPORTANTE: Envolver en un GtkButton en lugar de solo GtkImage
+        // para obtener el efecto hover automático
+        GtkWidget *button = gtk_button_new();
+        gtk_button_set_relief(GTK_BUTTON(button), GTK_RELIEF_NONE);
+        gtk_container_add(GTK_CONTAINER(button), m->icon);
+        gtk_container_add(GTK_CONTAINER(m->plugin_button), button);
+
+        // Guardar referencia al botón interno
+        g_object_set_data(G_OBJECT(m->plugin_button), "inner-button", button);
     }
 
     int icon_size = panel_get_icon_size(m->panel);
@@ -1209,17 +1431,70 @@ static void update_button_icon(ModernMenu *m)
     gtk_widget_show_all(m->plugin_button);
 }
 
-static gboolean on_plugin_button_press(GtkWidget *widget, GdkEventButton *event, gpointer user_data)
+/* Dibujar el fondo solo cuando el mouse está encima */
+static gboolean on_plugin_button_expose(GtkWidget *widget, GdkEventExpose *event, gpointer user_data)
 {
-    // Solo abrís tu menú con el clic izquierdo
-    if (event->button == 1) {
-        show_or_hide_menu(widget, user_data);
-        return TRUE; // consumido
+    ModernMenu *m = (ModernMenu *)user_data;
+    if (!m || !m->icon) return FALSE;
+
+    GtkStateType state = gtk_widget_get_state(widget);
+
+    // Solo dibujar si está en PRELIGHT (mouse encima)
+    if (state == GTK_STATE_PRELIGHT) {
+        GtkAllocation icon_alloc;
+        gtk_widget_get_allocation(m->icon, &icon_alloc);
+
+        // Crear contexto Cairo para dibujar con transparencia
+        cairo_t *cr = gdk_cairo_create(widget->window);
+
+        // Establecer el área de recorte para no dibujar fuera
+        gdk_cairo_rectangle(cr, &event->area);
+        cairo_clip(cr);
+
+        // Color celeste con transparencia (R, G, B, Alpha)
+        // Ajustá estos valores a tu gusto:
+        cairo_set_source_rgba(cr,
+                              0.5,   // Rojo (0.0 - 1.0)
+        0.7,   // Verde (0.0 - 1.0)
+        1.0,   // Azul (0.0 - 1.0)
+        0.3);  // Transparencia (0.0 = invisible, 1.0 = opaco)
+
+        cairo_rectangle(cr, icon_alloc.x, icon_alloc.y,
+                        icon_alloc.width, icon_alloc.height);
+        cairo_fill(cr);
+
+        cairo_destroy(cr);
     }
+
     return FALSE;
 }
 
+/* Mouse entra: activar hover */
+static gboolean on_plugin_button_enter(GtkWidget *widget, GdkEventCrossing *event, gpointer user_data)
+{
+    gtk_widget_set_state(widget, GTK_STATE_PRELIGHT);
+    gtk_widget_queue_draw(widget);
+    return FALSE;
+}
 
+/* Mouse sale: volver a normal */
+static gboolean on_plugin_button_leave(GtkWidget *widget, GdkEventCrossing *event, gpointer user_data)
+{
+    gtk_widget_set_state(widget, GTK_STATE_NORMAL);
+    gtk_widget_queue_draw(widget);
+    return FALSE;
+}
+
+static gboolean on_plugin_button_press(GtkWidget *widget, GdkEventButton *event, gpointer user_data)
+{
+    // Solo manejar click izquierdo
+    if (event->button == 1) {
+        show_or_hide_menu(widget, user_data);
+        return TRUE;
+    }
+    // Click derecho y otros: dejar pasar para el menú contextual del panel
+    return FALSE;
+}
 /* ==== CONSTRUCTOR PRINCIPAL DEL PLUGIN MODERN MENU ==== */
 GtkWidget *modernmenu_constructor(LXPanel *panel, config_setting_t *settings)
 {
@@ -1246,15 +1521,16 @@ GtkWidget *modernmenu_constructor(LXPanel *panel, config_setting_t *settings)
     GtkWidget *p = gtk_event_box_new();
     gtk_widget_set_has_window(p, TRUE);
     g_signal_connect(p, "button-press-event", G_CALLBACK(on_plugin_button_press), m);
+    g_signal_connect(p, "enter-notify-event", G_CALLBACK(on_plugin_button_enter), m);
+    g_signal_connect(p, "leave-notify-event", G_CALLBACK(on_plugin_button_leave), m);
+    g_signal_connect(p, "expose-event", G_CALLBACK(on_plugin_button_expose), m);
     gtk_container_set_border_width(GTK_CONTAINER(p), 0);
 
     /* ==== BOTÓN DEL MENÚ (ICONO EN EL PANEL) ==== */
-    // Este botón abre o cierra la ventana del menú
+    // Este ícono abre o cierra la ventana del menú
     GtkWidget *image = gtk_image_new();
-    m->plugin_button = p;   // EL BOTÓN ES EL EVENTBOX, NO EL GTKIMAGE
-
+    m->plugin_button = p;   // El EventBox es el plugin_button
     m->icon = image;        // guardamos la imagen real aquí
-
 
     update_button_icon(m);
     gtk_widget_set_tooltip_text(p, "Menú de aplicaciones");
@@ -1270,7 +1546,7 @@ GtkWidget *modernmenu_constructor(LXPanel *panel, config_setting_t *settings)
     gtk_window_set_skip_pager_hint(GTK_WINDOW(m->window), TRUE);
     gtk_window_set_type_hint(GTK_WINDOW(m->window), GDK_WINDOW_TYPE_HINT_POPUP_MENU);
     gtk_window_set_resizable(GTK_WINDOW(m->window), FALSE);
-    gtk_widget_set_size_request(m->window, 750, 500);
+    gtk_widget_set_size_request(m->window, 700, 500);
 
     /* ==== CONTENEDOR PRINCIPAL DE LA VENTANA ==== */
     GtkWidget *main_box = gtk_vbox_new(FALSE, 8);
@@ -1285,6 +1561,10 @@ GtkWidget *modernmenu_constructor(LXPanel *panel, config_setting_t *settings)
     /* ==== CARGA DE FAVORITOS ==== */
     // Se prepara la lista de favoritos para poder mostrarlos luego
     load_favorites(m);
+
+    /* ==== CARGA DE OCULTOS ==== */
+    // Se prepara la lista de ocultos para no mostrarlos
+    load_hidden_apps(m);
 
     /* ==== PANEL DE CATEGORÍAS ==== */
     GtkWidget *cat_scroll = gtk_scrolled_window_new(NULL, NULL);
@@ -1325,7 +1605,6 @@ GtkWidget *modernmenu_constructor(LXPanel *panel, config_setting_t *settings)
     gtk_box_pack_start(GTK_BOX(cat_box), m->categories, TRUE, TRUE, 0);
     gtk_widget_show(m->categories);
 
-
     /* ==== AÑADIR CATEGORÍAS AL PANEL PRINCIPAL ==== */
     gtk_box_pack_start(GTK_BOX(content), cat_scroll, FALSE, FALSE, 0);
 
@@ -1349,7 +1628,7 @@ GtkWidget *modernmenu_constructor(LXPanel *panel, config_setting_t *settings)
     gtk_button_set_image(GTK_BUTTON(btn_logout), logout_img);
     gtk_button_set_label(GTK_BUTTON(btn_logout), "Salir");
     gtk_button_set_image_position(GTK_BUTTON(btn_logout), GTK_POS_LEFT);
-    gtk_widget_set_tooltip_text(btn_logout, "Cerrar sesión");
+    gtk_widget_set_tooltip_text(btn_logout, "Apagar | Reiniciar | Suspender | Cerrar sesión");
     g_signal_connect(btn_logout, "clicked", G_CALLBACK(on_logout_clicked), m);
     gtk_box_pack_start(GTK_BOX(bottom_bar), btn_logout, FALSE, FALSE, 0);
 
@@ -1385,6 +1664,138 @@ GtkWidget *modernmenu_constructor(LXPanel *panel, config_setting_t *settings)
 
 FM_DEFINE_MODULE(lxpanel_gtk, modernmenu)
 
+/* Callback unhide_app */
+static void unhide_app(GtkButton *button, gpointer user_data)
+{
+    ModernMenu *m = (ModernMenu *)user_data;
+    const char *app_id = (const char *)g_object_get_data(G_OBJECT(button), "app-id");
+
+    g_print("unhide_app: Iniciando para app_id=%s\n", app_id ? app_id : "NULL");
+
+    if (!app_id || !m) {
+        g_print("unhide_app: app_id o m es NULL, abortando\n");
+        return;
+    }
+
+    // Buscar en la lista
+    for (GSList *l = m->hidden_apps; l; l = l->next) {
+        if (g_strcmp0((const char *)l->data, app_id) == 0) {
+            g_print("unhide_app: App encontrada en lista, eliminando...\n");
+
+            // Liberar el string
+            g_free(l->data);
+
+            // Remover de la lista
+            m->hidden_apps = g_slist_delete_link(m->hidden_apps, l);
+
+            // Guardar el archivo actualizado
+            g_print("unhide_app: Guardando archivo...\n");
+            save_hidden_apps(m);
+            g_print("unhide_app: Archivo guardado\n");
+
+            // Eliminar visualmente la fila del diálogo
+            GtkWidget *hbox = gtk_widget_get_parent(GTK_WIDGET(button));
+            if (hbox) {
+                g_print("unhide_app: Destruyendo widget visual\n");
+                gtk_widget_destroy(hbox);
+            }
+            g_print("unhide_app: Completado exitosamente\n");
+            break;
+        }
+    }
+}
+
+/* Callback para abrir el diálogo de apps ocultas desde la configuración */
+static void on_manage_hidden_button_clicked(GtkButton *button, gpointer user_data)
+{
+    ModernMenu *m = (ModernMenu *)user_data;
+
+    if (!m->hidden_apps) {
+        GtkWidget *dialog = gtk_message_dialog_new(NULL,
+                                                   GTK_DIALOG_MODAL,
+                                                   GTK_MESSAGE_INFO,
+                                                   GTK_BUTTONS_OK,
+                                                   "No hay aplicaciones ocultas");
+        gtk_dialog_run(GTK_DIALOG(dialog));
+        gtk_widget_destroy(dialog);
+        return;
+    }
+
+    GtkWidget *dialog = gtk_dialog_new_with_buttons("Aplicaciones Ocultas",
+                                                    NULL,
+                                                    GTK_DIALOG_MODAL,
+                                                    GTK_STOCK_CLOSE,
+                                                    GTK_RESPONSE_CLOSE,
+                                                    NULL);
+    gtk_window_set_default_size(GTK_WINDOW(dialog), 400, 300);
+
+    GtkWidget *content = gtk_dialog_get_content_area(GTK_DIALOG(dialog));
+
+    GtkWidget *scroll = gtk_scrolled_window_new(NULL, NULL);
+    gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroll),
+                                   GTK_POLICY_NEVER,
+                                   GTK_POLICY_AUTOMATIC);
+    gtk_box_pack_start(GTK_BOX(content), scroll, TRUE, TRUE, 5);
+
+    GtkWidget *vbox = gtk_vbox_new(FALSE, 5);
+    gtk_scrolled_window_add_with_viewport(GTK_SCROLLED_WINDOW(scroll), vbox);
+
+    // Buscar info de cada app oculta
+    for (GSList *l = m->hidden_apps; l; l = l->next) {
+        const char *hidden_id = (const char *)l->data;
+
+        // Buscar el MenuCacheItem correspondiente
+        MenuCacheItem *found_item = NULL;
+        for (GSList *al = m->all_apps; al; al = al->next) {
+            MenuCacheItem *item = MENU_CACHE_ITEM(al->data);
+            const char *item_id = menu_cache_item_get_id(item);
+            if (item_id && g_strcmp0(item_id, hidden_id) == 0) {
+                found_item = item;
+                break;
+            }
+        }
+
+        GtkWidget *hbox = gtk_hbox_new(FALSE, 10);
+        gtk_box_pack_start(GTK_BOX(vbox), hbox, FALSE, FALSE, 2);
+
+        // Icono
+        GtkWidget *img = gtk_image_new_from_icon_name("application-x-executable", GTK_ICON_SIZE_BUTTON);
+        if (found_item) {
+            GdkPixbuf *pb = get_app_icon(found_item, 24);
+            if (pb) {
+                gtk_image_set_from_pixbuf(GTK_IMAGE(img), pb);
+                g_object_unref(pb);
+            }
+        }
+        gtk_box_pack_start(GTK_BOX(hbox), img, FALSE, FALSE, 5);
+
+        // Nombre
+        const char *name = found_item ? menu_cache_item_get_name(found_item) : hidden_id;
+        GtkWidget *label = gtk_label_new(name);
+        gtk_misc_set_alignment(GTK_MISC(label), 0.0, 0.5);
+        gtk_box_pack_start(GTK_BOX(hbox), label, TRUE, TRUE, 5);
+
+        // Botón para mostrar
+        GtkWidget *btn = gtk_button_new_with_label("Mostrar");
+        g_object_set_data_full(G_OBJECT(btn), "app-id", g_strdup(hidden_id), g_free);
+        g_signal_connect(btn, "clicked", G_CALLBACK(unhide_app), m);
+        gtk_box_pack_start(GTK_BOX(hbox), btn, FALSE, FALSE, 5);
+    }
+
+    gtk_widget_show_all(dialog);
+    gtk_dialog_run(GTK_DIALOG(dialog));  // <-- ESTA LÍNEA FALTABA
+    gtk_widget_destroy(dialog);
+
+    // Refrescar la vista si el menú está abierto
+    if (m->window_shown) {
+        if (m->current_dir) {
+            populate_apps_for_dir(m, m->current_dir);
+        } else {
+            show_favorites_category(NULL, m);
+        }
+    }
+}
+
 /* Aplicar configuración */
 static gboolean modernmenu_apply_config(gpointer user_data)
 {
@@ -1399,21 +1810,44 @@ static gboolean modernmenu_apply_config(gpointer user_data)
     // Aplicar el cambio visual inmediatamente
     update_button_icon(m);
 
-    return FALSE;  // FALSE indica que se destruye el diálogo al aplicar
+    return FALSE;
 }
-
 
 static GtkWidget *modernmenu_config(LXPanel *panel, GtkWidget *p)
 {
     ModernMenu *m = lxpanel_plugin_get_data(p);
-    return lxpanel_generic_config_dlg(_("Modern Menu"), panel,
-                                      modernmenu_apply_config, p,
-                                      _("Icon"), &m->icon_path, CONF_TYPE_FILE_ENTRY,
-                                      NULL);
+
+    // Crear el diálogo de configuración estándar
+    GtkWidget *dlg = lxpanel_generic_config_dlg(_("Modern Menu"), panel,
+                                                modernmenu_apply_config, p,
+                                                _("Icon"), &m->icon_path, CONF_TYPE_FILE_ENTRY,
+                                                NULL);
+
+    // Agregar un botón personalizado para gestionar apps ocultas
+    GtkWidget *content = gtk_dialog_get_content_area(GTK_DIALOG(dlg));
+
+    // Separador
+    GtkWidget *separator = gtk_hseparator_new();
+    gtk_box_pack_start(GTK_BOX(content), separator, FALSE, FALSE, 10);
+
+    // Botón para gestionar aplicaciones ocultas
+    GtkWidget *hidden_box = gtk_hbox_new(FALSE, 5);
+    gtk_box_pack_start(GTK_BOX(content), hidden_box, FALSE, FALSE, 5);
+
+    GtkWidget *hidden_label = gtk_label_new("Aplicaciones ocultas:");
+    gtk_box_pack_start(GTK_BOX(hidden_box), hidden_label, FALSE, FALSE, 5);
+
+    GtkWidget *hidden_button = gtk_button_new_with_label("Gestionar");
+    gtk_box_pack_start(GTK_BOX(hidden_box), hidden_button, FALSE, FALSE, 5);
+    g_signal_connect(hidden_button, "clicked", G_CALLBACK(on_manage_hidden_button_clicked), m);
+
+    gtk_widget_show_all(content);
+
+    return dlg;
 }
 
 LXPanelPluginInit fm_module_init_lxpanel_gtk = {
-    .name = "Menu moderno",
+    .name = "Menú moderno",
     .description = "Menu de aplicaciones moderno con busqueda y favoritos incluidos",
     .new_instance = modernmenu_constructor,
     .config = modernmenu_config
