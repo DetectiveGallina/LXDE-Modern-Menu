@@ -48,9 +48,18 @@ La opción *“Preferencias”* depende de la existencia del binario **`lxshortc
 ```bash
 sudo apt install libfm-tools
 ```
+## Configuración
+Si se da click derecho sobre el ícono del menú aparecerá el menú contextual de lxpanel donde arriba de todo estará la opción de configurar. Si se le da click aparecerá una pequeña interfaz donde se puede hacer las siguientes acciones:
+
+* **Modificar el ícono**
+* **Modificar las aplicaciones ocultas**
+
+Para modificar el ícono se puede o bien pegar directamente la ruta, poner el nombre (por ejemplo: app-launcher) o bien darle a **Examinar** y buscar el ícono o imágen que deseemos entre las carpetas de nuestro sistema.
+
+Para modificar las aplicaciones ocultas tenemos el botón de **Gestionar**, que al darle click nos aparecerá otra ventana donde podremos ver cuáles aplicaciones están ocultas y al lado la opción de **Mostrar** para que dejen de estarlo.
 
 ## Compilación
-para compilarlo primero asegurese de isntalar los siguientes paquetes
+Para compilarlo primero asegurese de instalar los siguientes paquetes
 
 ```bash
 sudo apt install build-essential pkg-config libgtk2.0-dev lxpanel-dev libmenu-dev
@@ -67,3 +76,17 @@ make run
 **`make install`** copiará automaticamente el plugin a "/usr/lib/x86-64-linux-gnu/lxpanel/plugins", asegurese de revisar la ubicación de la carpeta /lxpanel/plugins en su sistema. Una vez la encuentre modifique el archivo Makefile con la ruta correcta. Alternativamente, puede ejecutar el comando con el agregado de **`INSTALL_DIR=`** y la ruta que corresponda en su sistema
 
 **`make run`** reiniciará lxpanel para que detecte el plugin correctamente. A veces por ejecutarlo muchas veces termina crasheando la sesión y debe de ejecutar lxsession otra vez para que funcione.
+
+## Compilación 32 bits
+En caso de compilar para 32 bits los pasos cambian un poco ya que en este caso el nombre del paquete **`libmenu-dev"`**  en bebian 32 bits cambia y se usa **`libmenu-cache-dev`**, por lo que el comando quedaría así:
+
+```bash
+sudo apt install build-essential pkg-config libgtk2.0-dev lxpanel-dev libmenu-cache-dev
+```
+
+Luego de instalados los paquetes, diríjase a la carpeta **32bits** y ejecute los mismos comandos del apartado **"Compilación"**.
+En este caso el Makefile contiene la ruta "/usr/lib/i386-linux-gnu/lxpanel/plugins" para el **`make install`**.
+
+## Agradecimientos
+
+Gracias a Uctumi de Cybercirujas por todo el feedback que me permitió mejorar este proyecto y por ayudarme con la versión de 32 bits, sin su ayuda quizás no se me habría pasado por la cabeza hacer la versión para 32bits.
