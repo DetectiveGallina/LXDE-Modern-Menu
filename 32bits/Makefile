@@ -1,6 +1,6 @@
 # ==== Configuración ====
 PLUGIN_NAME = modernmenu.so
-SRC = modern_menu.c
+SRC = ../modern_menu.c
 INSTALL_DIR = /usr/lib/i386-linux-gnu/lxpanel/plugins
 
 CFLAGS = -Wall `pkg-config --cflags gtk+-2.0 lxpanel`
