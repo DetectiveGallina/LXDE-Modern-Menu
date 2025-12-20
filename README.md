@@ -1,5 +1,5 @@
 # LXDE-Modern-Menu
-Un menú de aplicaciones de estilo más moderno para lxde
+Un menú de aplicaciones de estilo más moderno para LXDE
 
 ## Objetivo del proyecto
 
@@ -12,17 +12,19 @@ El objetivo de este proyecto es añadir a LXDE un menú con una apariencia más 
 - Un **botón de salida** que ejecuta el comando lxsession-logout de LXDE.
 - Una **lista de ocultas** para ocultar aquellas aplicaciones que no querés borrar pero tampoco ver.
 
----
 ## Imágenes de muestra
-Estas son imágenes del menú en la distro argentina Cyrujantix del grupo Cybercirujas, que viene con el menú preinstalado:
-![Imágen del menú recién abierto](img/modernmenu1.png)
-![Prueba de la barra de búsqueda](img/modernmenu3.png)
-![Muestra de las opciones del menú contextual](img/modernmenu4.png)
+Estas son imágenes del menú en la distro argentina Cirujantix del grupo Cybercirujas, que ya viene con el menú preinstalado:
+
+![Imagen del menú recién abierto](img/modernmenu1.png)  
+![Muestra de las opciones del menú contextual](img/modernmenu4.png)  
 ![Menú en 32 bits](img/modernmenu32bits.png)
 
-Esta es una muestra de cómo se puede ver el menú si se tiene un tema de gtk instalado de estilo Nord en el ejemplo:
-![Menú con tema Nord de gtk](img/modernmenuNord.png)
+## Soporte de estilos
+Esta es una muestra de cómo se puede ver el menú si se tiene instalado un tema GTK, como puede ser por ejemplo uno de estilo Nord:
 
+![Menú con tema Nord de GTK](img/modernmenuNord.png)
+
+---
 ## Instalación
 
 Clonar el repositorio con:
@@ -32,7 +34,7 @@ git clone https://github.com/tuusuario/LXDE-Modern-Menu.git
 cd LXDE-Modern-Menu
 ```
 
-y mover el archivo modernmenu.so a la carptea de plugins de lxpanel, que puede ser bien con 
+y mover el archivo modernmenu.so a la carpeta de plugins de lxpanel, que puede ser bien con 
 
 ```bash
 sudo cp ./modernmenu.so /usr/lib/lxpanel/plugins
@@ -42,8 +44,8 @@ o
 sudo cp ./modernmenu.so /usr/lib/x86-64-linux-gnu/lxpanel/plugins
 ```
 
-dependiendo de la ruta en que se encuentre la carpeta de los plugins para lxpanel.
-También puede usar el comando **`make install`** el cual se explica más abajo en el apartado de **Compilación**.
+dependiendo de la ruta en que se encuentre la carpeta de los plugins para lxpanel. También puedes usar el comando `make install`, cuyo funcionamiento se explica más abajo en el apartado de **Compilación**.
+
 Al hacer **clic derecho** sobre una aplicación en el menú, se abrirá un menú contextual con las siguientes opciones:
 
 * **Agregar a favoritos** / **Quitar de favoritos** (si ya está agregado)
@@ -52,23 +54,24 @@ Al hacer **clic derecho** sobre una aplicación en el menú, se abrirá un menú
 * **Eliminar**
 * **Preferencias**
 
-La opción *“Preferencias”* depende de la existencia del binario **`lxshortcut`**, que puede instalarse en bases debian con:
+La opción *“Preferencias”* depende de la existencia del binario `lxshortcut`, que puede instalarse en sistemas basados en Debian con:
 
 ```bash
 sudo apt install libfm-tools
 ```
+
 ## Configuración
 Si se da click derecho sobre el ícono del menú aparecerá el menú contextual de lxpanel donde arriba de todo estará la opción de configurar. Si se le da click aparecerá una pequeña interfaz donde se puede hacer las siguientes acciones:
 
 * **Modificar el ícono**
 * **Modificar las aplicaciones ocultas**
 
-Para modificar el ícono se puede o bien pegar directamente la ruta, poner el nombre (por ejemplo: app-launcher) o bien darle a **Examinar** y buscar el ícono o imágen que deseemos entre las carpetas de nuestro sistema.
+Para modificar el ícono se puede o bien pegar directamente la ruta, poner el nombre (por ejemplo: app-launcher) o bien darle a **Examinar** y buscar el ícono o imagen que deseemos entre las carpetas de nuestro sistema.
 
 Para modificar las aplicaciones ocultas tenemos el botón de **Gestionar**, que al darle click nos aparecerá otra ventana donde podremos ver cuáles aplicaciones están ocultas y al lado la opción de **Mostrar** para que dejen de estarlo.
 
 ## Compilación
-Para compilarlo primero asegurese de instalar los siguientes paquetes
+Para compilarlo primero asegúrese de instalar los siguientes paquetes
 
 ```bash
 sudo apt install build-essential pkg-config libgtk2.0-dev lxpanel-dev libmenu-dev
@@ -82,12 +85,12 @@ make install
 make run
 ```
 
-**`make install`** copiará automaticamente el plugin a "/usr/lib/x86-64-linux-gnu/lxpanel/plugins", asegurese de revisar la ubicación de la carpeta /lxpanel/plugins en su sistema. Una vez la encuentre modifique el archivo Makefile con la ruta correcta. Alternativamente, puede ejecutar el comando con el agregado de **`INSTALL_DIR=`** y la ruta que corresponda en su sistema
+**`make install`** copiará automáticamente el plugin a "/usr/lib/x86-64-linux-gnu/lxpanel/plugins", asegúrese de revisar la ubicación de la carpeta /lxpanel/plugins en su sistema. Una vez la encuentre modifique el archivo Makefile con la ruta correcta. Alternativamente, puede ejecutar el comando con el agregado de **`INSTALL_DIR=`** y la ruta que corresponda en su sistema
 
 **`make run`** reiniciará lxpanel para que detecte el plugin correctamente. A veces por ejecutarlo muchas veces termina crasheando la sesión y debe de ejecutar lxsession otra vez para que funcione.
 
 ## Compilación 32 bits
-En caso de compilar para 32 bits los pasos cambian un poco ya que en este caso el nombre del paquete **`libmenu-dev"`**  en Debian 32 bits cambia y se usa **`libmenu-cache-dev`**, por lo que el comando quedaría así:
+En caso de compilar para 32 bits los pasos cambian un poco ya que en este caso el nombre del paquete **`libmenu-dev`**  en Debian 32 bits cambia y se usa **`libmenu-cache-dev`**, por lo que el comando quedaría así:
 
 ```bash
 sudo apt install build-essential pkg-config libgtk2.0-dev lxpanel-dev libmenu-cache-dev
@@ -98,4 +101,4 @@ En este caso el Makefile contiene la ruta "/usr/lib/i386-linux-gnu/lxpanel/plugi
 
 ## Agradecimientos
 
-Gracias a Uctumi de Cybercirujas por todo el feedback que me permitió mejorar este proyecto y por ayudarme con la versión de 32 bits, sin su ayuda quizás no se me habría pasado por la cabeza hacer la versión para 32bits.
+Gracias a Uctumi de Cybercirujas por todo el feedback que me permitió mejorar este proyecto y por ayudarme con la versión de 32 bits, sin su ayuda quizás no se me habría pasado por la cabeza hacer la versión para esta arquitectura.
