@@ -13,6 +13,15 @@ El objetivo de este proyecto es añadir a LXDE un menú con una apariencia más 
 - Una **lista de ocultas** para ocultar aquellas aplicaciones que no querés borrar pero tampoco ver.
 
 ---
+## Imágenes de muestra
+Estas son imágenes del menú en la distro argentina Cyrujantix del grupo Cybercirujas, que viene con el menú preinstalado:
+![Imágen del menú recién abierto](img/modernmenu1.png)
+![Prueba de la barra de búsqueda](img/modernmenu3.png)
+![Muestra de las opciones del menú contextual](img/modernmenu4.png)
+![Menú en 32 bits](img/modernmenu32bits.png)
+
+Esta es una muestra de cómo se puede ver el menú si se tiene un tema de gtk instalado de estilo Nord en el ejemplo:
+![Menú con tema Nord de gtk](img/modernmenuNord.png)
 
 ## Instalación
 
