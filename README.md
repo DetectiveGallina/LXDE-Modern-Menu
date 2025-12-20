@@ -78,7 +78,7 @@ make run
 **`make run`** reiniciará lxpanel para que detecte el plugin correctamente. A veces por ejecutarlo muchas veces termina crasheando la sesión y debe de ejecutar lxsession otra vez para que funcione.
 
 ## Compilación 32 bits
-En caso de compilar para 32 bits los pasos cambian un poco ya que en este caso el nombre del paquete **`libmenu-dev"`**  en bebian 32 bits cambia y se usa **`libmenu-cache-dev`**, por lo que el comando quedaría así:
+En caso de compilar para 32 bits los pasos cambian un poco ya que en este caso el nombre del paquete **`libmenu-dev"`**  en Debian 32 bits cambia y se usa **`libmenu-cache-dev`**, por lo que el comando quedaría así:
 
 ```bash
 sudo apt install build-essential pkg-config libgtk2.0-dev lxpanel-dev libmenu-cache-dev
