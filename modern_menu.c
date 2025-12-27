@@ -619,10 +619,6 @@ static void show_context_menu(GtkWidget *app_button, ModernMenu *m, GdkEventButt
     gtk_widget_show(hide_item);
     g_signal_connect(hide_item, "activate", G_CALLBACK(toggle_hidden), app_button);
 
-    /* Separador */
-    GtkWidget *separator = gtk_separator_menu_item_new();
-    gtk_menu_shell_append(GTK_MENU_SHELL(menu), separator);
-    gtk_widget_show(separator);
 
     /* ===== Agregar al Escritorio ===== */
     const char *desktop_file = item ? menu_cache_item_get_file_path(item) : NULL;
@@ -648,6 +644,11 @@ static void show_context_menu(GtkWidget *app_button, ModernMenu *m, GdkEventButt
         g_free(dest_file);
         g_free(desktop_dir);
     }
+
+    /* Separador */
+    GtkWidget *separator = gtk_separator_menu_item_new();
+    gtk_menu_shell_append(GTK_MENU_SHELL(menu), separator);
+    gtk_widget_show(separator);
 
     /* ==== ELIMINAR PAQUETE ==== */
     GtkWidget *remove_pkg_item = gtk_menu_item_new_with_label("Eliminar paquete");
@@ -1222,17 +1223,16 @@ static void on_search_changed(GtkEditable *entry, gpointer user_data)
     }
 }
 
-static void run_command_async(const char *cmd, ModernMenu *m)
-{
-    if (!cmd) return;
-    g_spawn_command_line_async(cmd, NULL);
-    if (m) hide_menu(m);
-}
+extern void logout(void); // Llama a la función de logout de la configuración
 
 static void on_logout_clicked(GtkButton *b, gpointer user_data)
 {
     (void)b;
-    run_command_async("lxsession-logout", user_data);
+    ModernMenu *m = (ModernMenu *)user_data;
+
+    logout();  // Ejecuta la función para mostrar el mismo logout que el menú de LXDE
+
+    if (m) hide_menu(m);
 }
 
 static void position_window_near_button(ModernMenu *m)
@@ -1380,51 +1380,114 @@ static void update_button_icon(ModernMenu *m)
     // Si no existe el GtkImage, créalo
     if (!m->icon) {
         m->icon = gtk_image_new();
-
-        // IMPORTANTE: Envolver en un GtkButton en lugar de solo GtkImage
-        // para obtener el efecto hover automático
         GtkWidget *button = gtk_button_new();
         gtk_button_set_relief(GTK_BUTTON(button), GTK_RELIEF_NONE);
         gtk_container_add(GTK_CONTAINER(button), m->icon);
         gtk_container_add(GTK_CONTAINER(m->plugin_button), button);
-
-        // Guardar referencia al botón interno
         g_object_set_data(G_OBJECT(m->plugin_button), "inner-button", button);
     }
 
-    int icon_size = panel_get_icon_size(m->panel);
+    int panel_height = panel_get_icon_size(m->panel);  // Altura del panel
     const char *icon_name = (m->icon_path && *m->icon_path) ? m->icon_path : "start-here";
 
     GdkPixbuf *pix = NULL;
+    gboolean is_custom_image = FALSE;
 
-    // 1) Intentar cargar desde el tema
-    pix = gtk_icon_theme_load_icon(
-        gtk_icon_theme_get_default(),
-                                   icon_name,
-                                   icon_size,
-                                   GTK_ICON_LOOKUP_USE_BUILTIN,
-                                   NULL
-    );
+    // PRIMERO: Verificar si es una ruta de archivo personalizado
+    if (g_file_test(icon_name, G_FILE_TEST_EXISTS)) {
+        is_custom_image = TRUE;
 
-    // 2) Si no está en el tema, cargar desde archivo
-    if (!pix && g_file_test(icon_name, G_FILE_TEST_EXISTS)) {
-        pix = gdk_pixbuf_new_from_file_at_size(icon_name, icon_size, icon_size, NULL);
+        // Cargar la imagen original
+        GError *error = NULL;
+        pix = gdk_pixbuf_new_from_file(icon_name, &error);
+
+        if (pix) {
+            int orig_width = gdk_pixbuf_get_width(pix);
+            int orig_height = gdk_pixbuf_get_height(pix);
+
+            // TU LÓGICA: Si es cuadrado exacto (margen del 5%)
+            if (abs(orig_width - orig_height) <= (orig_height * 0.05)) {
+                // Imagen cuadrada: escalar al tamaño del panel (comportamiento actual)
+                GdkPixbuf *scaled = gdk_pixbuf_scale_simple(pix,
+                                                            panel_height,  // ancho = alto
+                                                            panel_height,  // alto = panel
+                                                            GDK_INTERP_BILINEAR);
+                g_object_unref(pix);
+                pix = scaled;
+            } else {
+                // Imagen NO cuadrada: TU LÓGICA
+                // 1. Ocupar TODO el alto del panel
+                // 2. Calcular ancho proporcional
+                double scale = (double)panel_height / orig_height;
+                int new_width = orig_width * scale;
+                int new_height = panel_height;  // Exactamente el alto del panel
+
+                // Escalar manteniendo proporciones
+                GdkPixbuf *scaled = gdk_pixbuf_scale_simple(pix,
+                                                            new_width,
+                                                            new_height,
+                                                            GDK_INTERP_BILINEAR);
+                g_object_unref(pix);
+                pix = scaled;
+
+                g_print("Imagen no cuadrada: %dx%d -> %dx%d (escala: %.2f)\n",
+                        orig_width, orig_height, new_width, new_height, scale);
+            }
+        }
+
+        if (error) {
+            g_error_free(error);
+            pix = NULL;
+        }
     }
 
-    // 3) Fallback final
+    // SEGUNDO: Si no es archivo personalizado o falló, buscar en tema
     if (!pix) {
         pix = gtk_icon_theme_load_icon(
             gtk_icon_theme_get_default(),
-                                       "application-x-executable",
-                                       icon_size,
+                                       icon_name,
+                                       panel_height,
                                        GTK_ICON_LOOKUP_USE_BUILTIN,
                                        NULL
         );
     }
 
-    // Asignar al GtkImage del plugin
+    // TERCERO: Fallback final
+    if (!pix) {
+        pix = gtk_icon_theme_load_icon(
+            gtk_icon_theme_get_default(),
+                                       "application-x-executable",
+                                       panel_height,
+                                       GTK_ICON_LOOKUP_USE_BUILTIN,
+                                       NULL
+        );
+    }
+
     if (pix) {
         gtk_image_set_from_pixbuf(GTK_IMAGE(m->icon), pix);
+
+        // AJUSTE DEL TAMAÑO DEL WIDGET
+        int pix_width = gdk_pixbuf_get_width(pix);
+        int pix_height = gdk_pixbuf_get_height(pix);
+
+        // Solo ajustar si es imagen personalizada NO cuadrada
+        if (is_custom_image && pix_width != pix_height) {
+            // Ajustar el tamaño del GtkImage
+            gtk_widget_set_size_request(m->icon, pix_width, pix_height);
+
+            // También ajustar el botón interno para que el hover sea correcto
+            GtkWidget *inner_button = g_object_get_data(
+                G_OBJECT(m->plugin_button), "inner-button");
+            if (inner_button) {
+                // El botón debe ser un poco más grande que la imagen
+                gtk_widget_set_size_request(inner_button,
+                                            pix_width + 6,   // margen 3px cada lado
+                                            pix_height + 6); // margen 3px arriba/abajo
+            }
+
+            g_print("Widget ajustado: %dx%d px\n", pix_width, pix_height);
+        }
+
         g_object_unref(pix);
     }
 
@@ -1439,28 +1502,27 @@ static gboolean on_plugin_button_expose(GtkWidget *widget, GdkEventExpose *event
 
     GtkStateType state = gtk_widget_get_state(widget);
 
-    // Solo dibujar si está en PRELIGHT (mouse encima)
     if (state == GTK_STATE_PRELIGHT) {
-        GtkAllocation icon_alloc;
-        gtk_widget_get_allocation(m->icon, &icon_alloc);
+        // Obtener tamaño del BOTÓN INTERNO (no del icono)
+        GtkWidget *inner_button = g_object_get_data(G_OBJECT(m->plugin_button), "inner-button");
+        GtkAllocation alloc;
 
-        // Crear contexto Cairo para dibujar con transparencia
+        if (inner_button) {
+            gtk_widget_get_allocation(inner_button, &alloc);
+        } else {
+            // Fallback: usar el icono
+            gtk_widget_get_allocation(m->icon, &alloc);
+        }
+
         cairo_t *cr = gdk_cairo_create(widget->window);
-
-        // Establecer el área de recorte para no dibujar fuera
         gdk_cairo_rectangle(cr, &event->area);
         cairo_clip(cr);
 
-        // Color celeste con transparencia (R, G, B, Alpha)
-        // Ajustá estos valores a tu gusto:
-        cairo_set_source_rgba(cr,
-                              0.5,   // Rojo (0.0 - 1.0)
-        0.7,   // Verde (0.0 - 1.0)
-        1.0,   // Azul (0.0 - 1.0)
-        0.3);  // Transparencia (0.0 = invisible, 1.0 = opaco)
+        // Color celeste con transparencia
+        cairo_set_source_rgba(cr, 0.5, 0.7, 1.0, 0.3);
 
-        cairo_rectangle(cr, icon_alloc.x, icon_alloc.y,
-                        icon_alloc.width, icon_alloc.height);
+        // Dibujar rectángulo sobre el área del botón interno
+        cairo_rectangle(cr, alloc.x, alloc.y, alloc.width, alloc.height);
         cairo_fill(cr);
 
         cairo_destroy(cr);
