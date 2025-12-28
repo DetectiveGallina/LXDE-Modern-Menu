@@ -30,7 +30,7 @@ Esta es una muestra de cómo se puede ver el menú si se tiene instalado un tema
 Clonar el repositorio con:
 
 ```bash
-git clone https://github.com/tuusuario/LXDE-Modern-Menu.git
+git clone https://github.com/DetectiveGallina/LXDE-Modern-Menu.git
 cd LXDE-Modern-Menu
 ```
 
