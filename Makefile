@@ -108,28 +108,27 @@ $(NATIVE_OUTPUT_DIR)/$(PLUGIN_NAME): $(SRC)
 # ==== COMPILACIÓN 32 BITS (Cruzada o nativa) ====
 32bits: clean-32bits
 	@echo "=== Compilando para 32 bits ==="
-
-	# Verificar si ya estamos en 32 bits
-	ifeq ($(NATIVE_BITS),32)
-		@echo "El sistema ya es de 32 bits, compilando nativamente..."
-		$(MAKE) $(NATIVE_OUTPUT_DIR)/$(PLUGIN_NAME)
-		@mv $(NATIVE_OUTPUT_DIR)/$(PLUGIN_NAME) $(32BIT_OUTPUT_DIR)/$(PLUGIN_NAME)
-	else
-		# Intentar compilación cruzada
-		@echo "Intentando compilación cruzada para i386..."
-		@if command -v i686-linux-gnu-gcc >/dev/null 2>&1; then \
-			echo "Usando i686-linux-gnu toolchain..."; \
+	
+	# Sistema 32-bit: compilar normalmente y mover a 32bits/
+	@if [ "$(NATIVE_BITS)" = "32" ]; then \
+		$(MAKE) $(NATIVE_OUTPUT_DIR)/$(PLUGIN_NAME); \
+		mkdir -p $(32BIT_OUTPUT_DIR); \
+		mv $(NATIVE_OUTPUT_DIR)/$(PLUGIN_NAME) $(32BIT_OUTPUT_DIR)/; \
+		echo "✓ Plugin 32 bits compilado nativamente"; \
+	
+	# Sistema 64-bit: elegir entre cross o native -m32
+	else \
+		if command -v i686-linux-gnu-gcc >/dev/null 2>&1; then \
 			$(MAKE) cross-32bits; \
 		elif command -v gcc -m32 >/dev/null 2>&1; then \
-			echo "Usando gcc -m32..."; \
 			$(MAKE) native-32bits; \
 		else \
-			echo "Error: No se encontró toolchain para 32 bits"; \
+			echo "Error: No toolchain para 32 bits encontrada"; \
 			echo "Instala: sudo apt install gcc-multilib libc6-dev-i386"; \
 			exit 1; \
-		fi
-	endif
-	@echo "✓ Plugin 32 bits compilado: $(32BIT_OUTPUT_DIR)/$(PLUGIN_NAME)"
+		fi; \
+		echo "✓ Plugin 32 bits compilado (cross-compilation)"; \
+	fi
 
 # Compilación cruzada con toolchain i686
 cross-32bits:
