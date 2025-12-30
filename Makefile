@@ -108,15 +108,11 @@ $(NATIVE_OUTPUT_DIR)/$(PLUGIN_NAME): $(SRC)
 # ==== COMPILACIÓN 32 BITS (Cruzada o nativa) ====
 32bits: clean-32bits
 	@echo "=== Compilando para 32 bits ==="
-	
-	# Sistema 32-bit: compilar normalmente y mover a 32bits/
 	@if [ "$(NATIVE_BITS)" = "32" ]; then \
 		$(MAKE) $(NATIVE_OUTPUT_DIR)/$(PLUGIN_NAME); \
 		mkdir -p $(32BIT_OUTPUT_DIR); \
 		mv $(NATIVE_OUTPUT_DIR)/$(PLUGIN_NAME) $(32BIT_OUTPUT_DIR)/; \
 		echo "✓ Plugin 32 bits compilado nativamente"; \
-	
-	# Sistema 64-bit: elegir entre cross o native -m32
 	else \
 		if command -v i686-linux-gnu-gcc >/dev/null 2>&1; then \
 			$(MAKE) cross-32bits; \
