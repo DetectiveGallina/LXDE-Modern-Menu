@@ -39,7 +39,7 @@ Para sistemas basados en Debian puedes usar directamente el archivo .deb que cor
 
 Una vez descargado usa el siguiente comando para instalarlo en tu sistema:
 
-En caso de desear eliminarlo puede hacerlo o bien con ```bash dpkg -r modernmenu```, o bien con ```bash apt remove modernmenu```, ambas deberían de funcionar correctamente.
+En caso de desear eliminarlo puede hacerlo o bien con ```dpkg -r modernmenu```, o bien con ```apt remove modernmenu```, ambas deberían de funcionar correctamente.
 
 ## Configuración
 Si se da click derecho sobre el ícono del menú aparecerá el menú contextual de lxpanel donde arriba de todo estará la opción de configurar. Si se le da click aparecerá una pequeña interfaz donde se pueden realizar las siguientes acciones:
@@ -77,10 +77,42 @@ En caso de compilar para 32 bits los pasos cambian un poco ya que en este caso e
 sudo apt install build-essential pkg-config libgtk2.0-dev lxpanel-dev libmenu-cache-dev
 ```
 
-Luego de instalados los paquetes, ejecute **`make 32bits`** y para instalar **`make install-32bits`**
+Luego de instalados los paquetes, ejecute **`make 32bits`** y para instalar **`make install-32bits`**.
+
+## Empaquetado
+El repositorio incluye un script para crear paquetes `.deb` con las siguientes opciones:
+
+Crear paquete para 64 bits
+```bash
+./create-deb.sh
+```
+Crear paquete para 32 bits
+```bash
+./create-deb.sh 32bits
+```
+Limpiar paquetes generados
+```bash
+./create-deb.sh clean
+```
+
+## Traducciones
+El menú soporta múltiples idiomas mediante gettext. Los archivos de traducción están en la carpeta `po/`.
+
+### Agregar un nuevo idioma:
+```bash
+make new-lang LANG=codigo
+# Ejemplo: make new-lang LANG=fr
+# Editar po/fr.po
+make update-po
+```
+
+### Idiomas disponibles:
+- Español (es)
+- Inglés (default)
+- Portugués (pt)
 
 ## Agradecimientos
 
 Gracias a Uctumi de Cybercirujas por todo el feedback que me permitió mejorar este proyecto y por ayudarme con la versión de 32 bits, sin su ayuda quizás no se me habría pasado por la cabeza hacer la versión para esta arquitectura.
 
-Gracias a Nico de Locos por Linux por la ayuda en los directos y por incluir el menú en Loc-OS 24, gracias a esto me puse las pilas agregar soporte a traducciones.
+Gracias a Nico de Locos por Linux por la ayuda en los directos y por incluir el menú en Loc-OS 24, gracias a esto me puse las pilas para agregar el soporte a traducciones.
