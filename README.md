@@ -1,12 +1,9 @@
 # LXDE-Modern-Menu
 A more modern-style application menu for LXDE
 
-## Languages
-Choose your preferred language:  
- 
-- [Spanish](README.es.md)
+### Choose your preferred language:  
+[![Español](https://img.shields.io/badge/Language-Español-red)](README.es.md)
 
---- 
 ## Project Goal
 
 The goal of this project is to add a more modern and intuitive-looking menu to LXDE for new users, without losing the characteristic lightness of the environment. The design is partially inspired by KDE's style, and includes:
