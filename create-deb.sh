@@ -7,7 +7,7 @@ set -e  # Salir en error
 DEB_NAME="modernmenu"
 DEFAULT_VERSION="1.0.0"
 DEFAULT_MAINTAINER="$(git config user.name 2>/dev/null || echo "Your name") <$(git config user.email 2>/dev/null || echo "your@email.com")>"
-DEFAULT_DEPENDS="lxpanel, libfm"
+DEFAULT_DEPENDS="lxpanel"
 DEB_DESCRIPTION="Modern menu plugin for LXPanel"
 
 # Mostrar información actual y dependencias
