@@ -1,0 +1,18 @@
+# Build artifacts
+build/
+32bits/
+*.so
+*.o
+
+# Paquetes Debian
+*.deb
+modernmenu_*/
+
+# Traducciones compiladas
+*.mo
+locale/
+
+# Archivos temporales
+*~
+*.swp
+*.bak

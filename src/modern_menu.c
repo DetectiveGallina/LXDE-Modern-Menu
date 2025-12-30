@@ -1,5 +1,5 @@
-/* modern_menu_fixed.c
- * Modern Menu Plugin for LXPanel (corregido)
+/*
+ * Modern Menu Plugin for LXPanel
  * Based on lxpanel-plugin-example structure
  */
 #define _GNU_SOURCE
@@ -16,8 +16,18 @@
 #include <libfm/fm-utils.h>
 #include <string.h>
 
-#ifndef _
+/* ===== CONFIGURACIÓN GETTEXT ===== */
+#ifdef ENABLE_NLS
+#include <libintl.h>
+#include <locale.h>
+#define _(String) gettext(String)
+#define N_(String) (String)  /* Para strings en arrays */
+#else
 #define _(String) (String)
+#define N_(String) (String)
+#endif
+
+#ifndef APPS_PER_ROW
 #define APPS_PER_ROW 3  // Cantidad máxima de aplicaciones que se van a mostrar por fila
 #endif
 
@@ -38,13 +48,13 @@ typedef struct {
     GtkWidget *plugin_button;
     GSList *all_apps;     // Lista de todas las apps
     GSList *favorites;    // Lista apps favoritas
+    GSList *hidden_apps;  // Lista apps ocultas
     gchar *favorites_path;
     gchar *icon_path;
     config_setting_t *settings;
     gboolean suppress_hide;
     GtkWidget *btn_fav;
     gboolean switching_category;
-    GSList *hidden_apps;  // Lista apps ocultas
 } ModernMenu;
 
 enum {
@@ -65,16 +75,16 @@ static void launch_app_from_item(GtkWidget *button, gpointer user_data)
     MenuCacheItem *item = (MenuCacheItem *) user_data;
     ModernMenu *m = g_object_get_data(G_OBJECT(button), "modern-menu");
     if (!item) {
-        g_warning("No hay MenuCacheItem asociado al botón");
+        g_warning(_("No MenuCacheItem associated with the button"));
         return;
     }
 
     const gchar *desktop_path = menu_cache_item_get_file_path(item);
     if (!desktop_path) {
-        g_warning("No se pudo obtener el archivo .desktop del ítem");
+        g_warning(_("Could not get .desktop file from the item"));
         return;
     }
-    g_print("Intentando lanzar: %s\n", desktop_path);
+    g_print(_("Attempting to launch: %s\n"), desktop_path);
 
     GDesktopAppInfo *dinfo = g_desktop_app_info_new_from_filename(desktop_path);
     if (dinfo) {
@@ -87,10 +97,10 @@ static void launch_app_from_item(GtkWidget *button, gpointer user_data)
         gdk_app_launch_context_set_timestamp(context, gtk_get_current_event_time());
 
         if (!g_app_info_launch(G_APP_INFO(dinfo), NULL, G_APP_LAUNCH_CONTEXT(context), &error)) {
-            g_warning("Error al lanzar '%s': %s", desktop_path, error->message);
+            g_warning(_("Error launching '%s': %s"), desktop_path, error->message);
             g_clear_error(&error);
         } else {
-            g_print("Aplicación lanzada exitosamente\n");
+            g_print(_("Application launched successfully\n"));
         }
 
         g_object_unref(context);
@@ -100,7 +110,7 @@ static void launch_app_from_item(GtkWidget *button, gpointer user_data)
             hide_menu(m);
         }
     } else {
-        g_warning("No se pudo crear GDesktopAppInfo desde archivo '%s'", desktop_path);
+        g_warning(_("Could not create GDesktopAppInfo from file '%s'"), desktop_path);
     }
 }
 
@@ -130,7 +140,7 @@ static void load_favorites(ModernMenu *m)
         g_free(content);
     }
 
-    g_print("Favoritos cargados: %d\n", g_slist_length(m->favorites));
+    g_print(_("Favorites loaded: %d\n"), g_slist_length(m->favorites));
 }
 
 static void save_favorites(ModernMenu *m)
@@ -143,7 +153,7 @@ static void save_favorites(ModernMenu *m)
     g_file_set_contents(m->favorites_path, data->str, -1, NULL);
     g_string_free(data, TRUE);
 
-    g_print("Favoritos guardados: %d\n", g_slist_length(m->favorites));
+    g_print(_("Favorites saved: %d\n"), g_slist_length(m->favorites));
 }
 
 static gboolean is_favorite(ModernMenu *m, const char *app_id)
@@ -191,14 +201,15 @@ static void toggle_favorite(GtkWidget *menuitem, gpointer user_data)
         gtk_widget_destroy(menuitem);
         GtkWidget *new_item;
         if (is_favorite(m, id))
-            new_item = gtk_menu_item_new_with_label("Quitar de Favoritos");
+            new_item = gtk_menu_item_new_with_label(_("Remove from Favorites"));
         else
-            new_item = gtk_menu_item_new_with_label("Agregar a Favoritos");
+            new_item = gtk_menu_item_new_with_label(_("Add to Favorites"));
         gtk_menu_shell_append(GTK_MENU_SHELL(menu), new_item);
         gtk_widget_show(new_item);
         g_signal_connect(new_item, "activate", G_CALLBACK(toggle_favorite), btn);
     }
 }
+
 /* ===== Callback: Agregar al Escritorio ===== */
 static void add_to_desktop(GtkMenuItem *menuitem, gpointer user_data)
 {
@@ -214,7 +225,7 @@ static void add_to_desktop(GtkMenuItem *menuitem, gpointer user_data)
 
     /* Ruta de destino */
     const char *home = g_get_home_dir();
-    gchar *desktop_dir = g_build_filename(home, "Escritorio", NULL);
+    gchar *desktop_dir = g_build_filename(home, _("Desktop"), NULL);
     if (!g_file_test(desktop_dir, G_FILE_TEST_IS_DIR)) {
         g_free(desktop_dir);
         desktop_dir = g_build_filename(home, "Desktop", NULL);
@@ -225,7 +236,7 @@ static void add_to_desktop(GtkMenuItem *menuitem, gpointer user_data)
 
     /* Si ya existe, no hacer nada */
     if (g_file_test(dest_file, G_FILE_TEST_EXISTS)) {
-        g_message("El acceso directo ya existe en el escritorio.");
+        g_message(_("The shortcut already exists on the desktop."));
         goto cleanup;
     }
 
@@ -237,12 +248,13 @@ static void add_to_desktop(GtkMenuItem *menuitem, gpointer user_data)
                      G_FILE_COPY_NONE,
                      NULL, NULL, NULL, &error))
     {
-        g_warning("Error copiando a escritorio: %s", error->message);
+        g_warning(_("Error copying to desktop: %s"), error->message);
         g_error_free(error);
     } else {
         g_chmod(dest_file, 0755);
         /* Notificación opcional */
-        gchar *cmd = g_strdup_printf("notify-send 'Agregado al escritorio' '%s'", app_name);
+        gchar *cmd = g_strdup_printf("notify-send '%s' '%s'",
+                                     _("Added to desktop"), app_name);
         g_spawn_command_line_async(cmd, NULL);
         g_free(cmd);
     }
@@ -252,6 +264,7 @@ static void add_to_desktop(GtkMenuItem *menuitem, gpointer user_data)
     g_free(dest_file);
     g_free(desktop_dir);
 }
+
 /* ==== Mostrar diálogo de error simple ==== */
 static void show_error_dialog(const gchar *message)
 {
@@ -263,7 +276,7 @@ static void show_error_dialog(const gchar *message)
         "%s",
         message
     );
-    gtk_window_set_title(GTK_WINDOW(dialog), "Error");
+    gtk_window_set_title(GTK_WINDOW(dialog), _("Error"));
     gtk_dialog_run(GTK_DIALOG(dialog));
     gtk_widget_destroy(dialog);
 }
@@ -277,7 +290,7 @@ static gchar *get_exec_from_desktop(const char *desktop_path)
     GError *error = NULL;
 
     if (!g_key_file_load_from_file(keyfile, desktop_path, G_KEY_FILE_NONE, &error)) {
-        show_error_dialog("No se pudo cargar el archivo .desktop.");
+        show_error_dialog(_("Could not load .desktop file."));
         if (error) g_error_free(error);
         g_key_file_free(keyfile);
         return NULL;
@@ -287,7 +300,7 @@ static gchar *get_exec_from_desktop(const char *desktop_path)
     g_key_file_free(keyfile);
 
     if (!exec || !*exec) {
-        show_error_dialog("El archivo .desktop no tiene un campo 'Exec' válido.");
+        show_error_dialog(_("The .desktop file does not have a valid 'Exec' field."));
         g_free(exec);
         return NULL;
     }
@@ -322,7 +335,7 @@ static void on_remove_package(GtkWidget *widget, gpointer user_data)
 
     gchar *exec = get_exec_from_desktop(desktop_path);
     if (!exec || !*exec) {
-        show_error_dialog("No se pudo determinar el ejecutable del archivo .desktop.");
+        show_error_dialog(_("Could not determine the executable from the .desktop file."));
         g_free(exec);
         return;
     }
@@ -345,7 +358,7 @@ static void on_remove_package(GtkWidget *widget, gpointer user_data)
     }
 
     if (!pkg_manager) {
-        show_error_dialog("No se detectó ningún gestor de paquetes compatible (dpkg o pacman).");
+        show_error_dialog(_("No compatible package manager detected (dpkg or pacman)."));
         g_free(exec);
         g_free(exec_path);
         return;
@@ -355,8 +368,8 @@ static void on_remove_package(GtkWidget *widget, gpointer user_data)
     GtkWidget *dialog = gtk_message_dialog_new(
         NULL, GTK_DIALOG_MODAL,
         GTK_MESSAGE_WARNING, GTK_BUTTONS_YES_NO,
-        "¿Deseas eliminar el paquete asociado a esta aplicación?");
-    gtk_window_set_title(GTK_WINDOW(dialog), "Confirmar eliminación");
+        _("Do you want to remove the package associated with this application?"));
+    gtk_window_set_title(GTK_WINDOW(dialog), _("Confirm removal"));
     gint response = gtk_dialog_run(GTK_DIALOG(dialog));
     gtk_widget_destroy(dialog);
     if (response != GTK_RESPONSE_YES) {
@@ -397,7 +410,7 @@ static void on_remove_package(GtkWidget *widget, gpointer user_data)
     g_free(output);
 
     if (!pkg_name || !*pkg_name) {
-        show_error_dialog("No se pudo determinar el paquete al que pertenece esta aplicación.");
+        show_error_dialog(_("Could not determine which package this application belongs to."));
         g_free(exec);
         g_free(exec_path);
         g_free(pkg_name);
@@ -431,7 +444,7 @@ static void on_remove_package(GtkWidget *widget, gpointer user_data)
     } else if (terminal_cmd) {
         cmd_remove = g_strdup_printf("%s -e 'sudo %s'", terminal_cmd, remove_cmd);
     } else {
-        show_error_dialog("No se encontró un método para pedir autenticación (pkexec, sudo -A o terminal).");
+        show_error_dialog(_("Could not find a method to request authentication (pkexec, sudo -A)."));
         g_free(remove_cmd);
         g_free(exec);
         g_free(exec_path);
@@ -444,7 +457,7 @@ static void on_remove_package(GtkWidget *widget, gpointer user_data)
     g_spawn_command_line_sync(cmd_remove, &output_remove, NULL, &status_remove, NULL);
 
     if (status_remove != 0) {
-        show_error_dialog("No se pudo eliminar el paquete. Verifica los permisos o el método de autenticación.");
+        show_error_dialog(_("Could not remove the package. Check permissions or authentication method."));
     }
 
     g_free(output_remove);
@@ -461,26 +474,35 @@ static void show_properties(GtkMenuItem *menuitem, gpointer user_data)
     GtkWidget *app_button = GTK_WIDGET(user_data);
     if (!app_button) return;
 
+    // Obtener el MenuCacheItem desde el botón (como ya lo haces)
     MenuCacheItem *item = g_object_get_data(G_OBJECT(app_button), "menu-item");
     if (!item) return;
 
-    const char *desktop_file = menu_cache_item_get_file_path(item);
-    if (!desktop_file) return;
+    // Crear FmFileInfo a partir del MenuCacheItem (como hace LXPanel)
+    char *mpath = menu_cache_dir_make_path(MENU_CACHE_DIR(item));
+    FmPath *path = fm_path_new_relative(fm_path_get_apps_menu(), mpath + 13); // skip "/Applications"
+    FmFileInfo *fi = fm_file_info_new_from_menu_cache_item(path, item);
 
-    // Detectar editor de propiedades
-    const char *editor = g_find_program_in_path("lxshortcut");
-    if (!editor) {
-        editor = NULL;
+    g_free(mpath);
+    fm_path_unref(path);
+
+    if (!fi) {
+        g_warning(_("Could not create FmFileInfo for the menu item"));
+        return;
     }
 
-    if (editor) {
-        gchar *cmd = g_strdup_printf("%s -i \"%s\"", editor, desktop_file);
-        g_spawn_command_line_async(cmd, NULL);
-        g_free(cmd);
-    } else {
-        show_error_dialog("Editar propiedades no está disponible. Tal vez deba intentar instalar lxshortcut o libfm-tools");
-    }
+    // Crear lista de archivos (solo este archivo)
+    FmFileInfoList *files = fm_file_info_list_new();
+    fm_file_info_list_push_tail(files, fi);
+
+    // Mostrar diálogo de propiedades (igual que LXPanel)
+    fm_show_file_properties(NULL, files);
+
+    // Liberar recursos
+    fm_file_info_list_unref(files);
+    // NOTA: fi se libera automáticamente al liberar la lista
 }
+
 /* ===== FUNCIONES PARA GESTIONAR APLICACIONES OCULTAS ===== */
 
 /* Cargar lista de apps ocultas desde archivo */
@@ -519,7 +541,7 @@ static void save_hidden_apps(ModernMenu *m)
     FILE *f = fopen(hidden_file, "w");
 
     if (f) {
-        fprintf(f, "# Hidden applications for Modern Menu\n");
+        fprintf(f, _("# Hidden applications for Modern Menu\n"));
         for (GSList *l = m->hidden_apps; l; l = l->next) {
             fprintf(f, "%s\n", (char *)l->data);
         }
@@ -605,7 +627,7 @@ static void show_context_menu(GtkWidget *app_button, ModernMenu *m, GdkEventButt
 
     /* ===== Agregar/Quitar de Favoritos ===== */
     GtkWidget *fav_item = gtk_menu_item_new_with_label(
-        is_fav ? "Quitar de Favoritos" : "Agregar a Favoritos"
+        is_fav ? _("Quitar de Favoritos") : _("Agregar a Favoritos")
     );
     gtk_menu_shell_append(GTK_MENU_SHELL(menu), fav_item);
     gtk_widget_show(fav_item);
@@ -613,7 +635,7 @@ static void show_context_menu(GtkWidget *app_button, ModernMenu *m, GdkEventButt
 
     /* ===== Ocultar/Mostrar aplicación ===== */
     GtkWidget *hide_item = gtk_menu_item_new_with_label(
-        is_hid ? "Mostrar aplicación" : "Ocultar aplicación"
+        is_hid ? _("Show application") : _("Hide application")
     );
     gtk_menu_shell_append(GTK_MENU_SHELL(menu), hide_item);
     gtk_widget_show(hide_item);
@@ -624,7 +646,7 @@ static void show_context_menu(GtkWidget *app_button, ModernMenu *m, GdkEventButt
     const char *desktop_file = item ? menu_cache_item_get_file_path(item) : NULL;
     if (desktop_file) {
         const char *home = g_get_home_dir();
-        gchar *desktop_dir = g_build_filename(home, "Escritorio", NULL);
+        gchar *desktop_dir = g_build_filename(home, _("Desktop"), NULL);
         if (!g_file_test(desktop_dir, G_FILE_TEST_IS_DIR)) {
             g_free(desktop_dir);
             desktop_dir = g_build_filename(home, "Desktop", NULL);
@@ -634,7 +656,7 @@ static void show_context_menu(GtkWidget *app_button, ModernMenu *m, GdkEventButt
         gchar *dest_file = g_build_filename(desktop_dir, basename, NULL);
 
         if (!g_file_test(dest_file, G_FILE_TEST_EXISTS)) {
-            GtkWidget *desktop_item = gtk_menu_item_new_with_label("Agregar al Escritorio");
+            GtkWidget *desktop_item = gtk_menu_item_new_with_label(_("Add to Desktop"));
             gtk_menu_shell_append(GTK_MENU_SHELL(menu), desktop_item);
             gtk_widget_show(desktop_item);
             g_signal_connect(desktop_item, "activate", G_CALLBACK(add_to_desktop), app_button);
@@ -651,7 +673,7 @@ static void show_context_menu(GtkWidget *app_button, ModernMenu *m, GdkEventButt
     gtk_widget_show(separator);
 
     /* ==== ELIMINAR PAQUETE ==== */
-    GtkWidget *remove_pkg_item = gtk_menu_item_new_with_label("Eliminar paquete");
+    GtkWidget *remove_pkg_item = gtk_menu_item_new_with_label(_("Remove package"));
     gtk_menu_shell_append(GTK_MENU_SHELL(menu), remove_pkg_item);
     gtk_widget_show(remove_pkg_item);
 
@@ -663,7 +685,7 @@ static void show_context_menu(GtkWidget *app_button, ModernMenu *m, GdkEventButt
         g_signal_connect(remove_pkg_item, "activate", G_CALLBACK(on_remove_package), g_strdup(desktop_path));
 
     /* ===== Propiedades ===== */
-    GtkWidget *prop_item = gtk_menu_item_new_with_label("Propiedades");
+    GtkWidget *prop_item = gtk_menu_item_new_with_label(_("Properties"));
     gtk_menu_shell_append(GTK_MENU_SHELL(menu), prop_item);
     gtk_widget_show(prop_item);
     g_signal_connect(prop_item, "activate", G_CALLBACK(show_properties), app_button);
@@ -782,7 +804,7 @@ static void show_favorites_category(GtkWidget *widget, gpointer user_data)
     g_list_free(children);
 
     if (!m->favorites) {
-        GtkWidget *lbl = gtk_label_new("No hay aplicaciones favoritas");
+        GtkWidget *lbl = gtk_label_new(_("There's no favorite applications"));
         gtk_misc_set_alignment(GTK_MISC(lbl), 0.5, 0.5);
         gtk_box_pack_start(GTK_BOX(m->apps_box), lbl, FALSE, FALSE, 4);
         gtk_widget_show(lbl);
@@ -865,8 +887,9 @@ static void show_favorites_category(GtkWidget *widget, gpointer user_data)
 static GdkPixbuf *get_app_icon(MenuCacheItem *item, int size)
 {
     const char *icon_name = menu_cache_item_get_icon(item);
-    if (!icon_name || !*icon_name)
+    if (!icon_name || !*icon_name) {
         icon_name = "application-x-executable"; // fallback seguro
+    }
 
     GtkIconTheme *theme = gtk_icon_theme_get_default();
     GdkPixbuf *pb = NULL;
@@ -914,7 +937,7 @@ static void populate_apps_for_dir(ModernMenu *m, MenuCacheDir *dir)
     g_list_free(children);
 
     if (!dir) {
-        GtkWidget *lbl = gtk_label_new("No applications");
+        GtkWidget *lbl = gtk_label_new(_("No applications"));
         gtk_misc_set_alignment(GTK_MISC(lbl), 0.5, 0.5);
         gtk_box_pack_start(GTK_BOX(m->apps_box), lbl, FALSE, FALSE, 4);
         gtk_widget_show(lbl);
@@ -923,7 +946,7 @@ static void populate_apps_for_dir(ModernMenu *m, MenuCacheDir *dir)
 
     GSList *list = menu_cache_dir_list_children(dir);
     if (!list) {
-        GtkWidget *lbl = gtk_label_new("No applications in this category");
+        GtkWidget *lbl = gtk_label_new(_("No applications in this category"));
         gtk_misc_set_alignment(GTK_MISC(lbl), 0.5, 0.5);
         gtk_box_pack_start(GTK_BOX(m->apps_box), lbl, FALSE, FALSE, 4);
         gtk_widget_show(lbl);
@@ -1006,7 +1029,7 @@ static void populate_apps_for_dir(ModernMenu *m, MenuCacheDir *dir)
     g_slist_free(list);
 
     if (count == 0) {
-        GtkWidget *lbl = gtk_label_new("No applications in this category");
+        GtkWidget *lbl = gtk_label_new(_("No applications in this category"));
         gtk_misc_set_alignment(GTK_MISC(lbl), 0.5, 0.5);
         gtk_box_pack_start(GTK_BOX(m->apps_box), lbl, FALSE, FALSE, 4);
         gtk_widget_show(lbl);
@@ -1131,7 +1154,7 @@ static void build_all_apps_list(ModernMenu *m)
     menu_cache_item_unref(MENU_CACHE_ITEM(root));
     #endif
 
-    g_print("Total apps en all_apps: %d\n", g_slist_length(m->all_apps));
+    g_print(_("Total apps in all_apps: %d\n"), g_slist_length(m->all_apps));
 }
 
 static void on_search_changed(GtkEditable *entry, gpointer user_data)
@@ -1216,7 +1239,7 @@ static void on_search_changed(GtkEditable *entry, gpointer user_data)
     }
 
     if (count == 0) {
-        GtkWidget *lbl = gtk_label_new("No se encontró aplicaciones que coincidan");
+        GtkWidget *lbl = gtk_label_new(_("No matching applications found"));
         gtk_misc_set_alignment(GTK_MISC(lbl), 0.5, 0.5);
         gtk_box_pack_start(GTK_BOX(m->apps_box), lbl, FALSE, FALSE, 4);
         gtk_widget_show(lbl);
@@ -1272,8 +1295,9 @@ static void hide_menu(ModernMenu *m)
 {
     if (!m || !m->window) return;
 
-    if (m->suppress_hide)
+    if (m->suppress_hide) {
         return; // evita cierre si hay menú contextual abierto
+    }
 
     if (m->window_shown) {
         gtk_widget_hide(m->window);
@@ -1430,7 +1454,7 @@ static void update_button_icon(ModernMenu *m)
                 g_object_unref(pix);
                 pix = scaled;
 
-                g_print("Imagen no cuadrada: %dx%d -> %dx%d (escala: %.2f)\n",
+                g_print(_("Non-square image: %dx%d -> %dx%d (scale: %.2f)\n"),
                         orig_width, orig_height, new_width, new_height, scale);
             }
         }
@@ -1485,7 +1509,7 @@ static void update_button_icon(ModernMenu *m)
                                             pix_height + 6); // margen 3px arriba/abajo
             }
 
-            g_print("Widget ajustado: %dx%d px\n", pix_width, pix_height);
+            g_print(_("Widget adjusted: %dx%d px\n"), pix_width, pix_height);
         }
 
         g_object_unref(pix);
@@ -1561,6 +1585,12 @@ static gboolean on_plugin_button_press(GtkWidget *widget, GdkEventButton *event,
 GtkWidget *modernmenu_constructor(LXPanel *panel, config_setting_t *settings)
 {
     /* ==== CREACIÓN Y CONFIGURACIÓN INICIAL ==== */
+    #ifdef ENABLE_NLS
+    setlocale(LC_ALL, "");
+    bindtextdomain("modernmenu", "/usr/share/locale");
+    bind_textdomain_codeset("modernmenu", "UTF-8");
+    textdomain("modernmenu");
+    #endif
     // Crea la estructura base que guarda todos los datos del menú
     ModernMenu *m = g_new0(ModernMenu, 1);
     m->panel = panel;
@@ -1595,7 +1625,7 @@ GtkWidget *modernmenu_constructor(LXPanel *panel, config_setting_t *settings)
     m->icon = image;        // guardamos la imagen real aquí
 
     update_button_icon(m);
-    gtk_widget_set_tooltip_text(p, "Menú de aplicaciones");
+    gtk_widget_set_tooltip_text(p, _("Applications Menu"));
 
     gtk_container_add(GTK_CONTAINER(p), image);
     gtk_widget_show(image);
@@ -1640,9 +1670,9 @@ GtkWidget *modernmenu_constructor(LXPanel *panel, config_setting_t *settings)
     gtk_widget_show(cat_box);
 
     /* ==== BOTÓN DE FAVORITOS ==== */
-    GtkWidget *btn_fav = gtk_toggle_button_new_with_label("★ Favoritos");
+    GtkWidget *btn_fav = gtk_toggle_button_new_with_label(_("★ Favorites"));
     gtk_button_set_relief(GTK_BUTTON(btn_fav), GTK_RELIEF_NONE);
-    gtk_widget_set_tooltip_text(btn_fav, "Aplicaciones favoritas");
+    gtk_widget_set_tooltip_text(btn_fav, _("Favorite applications"));
     g_signal_connect(btn_fav, "toggled", G_CALLBACK(show_favorites_category), m);
     m->btn_fav = btn_fav;
     gtk_box_pack_start(GTK_BOX(cat_box), btn_fav, FALSE, FALSE, 4);
@@ -1656,7 +1686,7 @@ GtkWidget *modernmenu_constructor(LXPanel *panel, config_setting_t *settings)
     // Renderiza texto en la lista
     GtkCellRenderer *renderer = gtk_cell_renderer_text_new();
     GtkTreeViewColumn *column = gtk_tree_view_column_new_with_attributes(
-        "Category", renderer, "text", COL_NAME, NULL);
+        _("Category"), renderer, "text", COL_NAME, NULL);
     gtk_tree_view_append_column(GTK_TREE_VIEW(m->categories), column);
 
     // Conecta selección de categoría con su callback
@@ -1688,14 +1718,14 @@ GtkWidget *modernmenu_constructor(LXPanel *panel, config_setting_t *settings)
     GtkWidget *btn_logout = gtk_button_new();
     GtkWidget *logout_img = gtk_image_new_from_icon_name("system-log-out", GTK_ICON_SIZE_BUTTON);
     gtk_button_set_image(GTK_BUTTON(btn_logout), logout_img);
-    gtk_button_set_label(GTK_BUTTON(btn_logout), "Salir");
+    gtk_button_set_label(GTK_BUTTON(btn_logout), _("Exit"));
     gtk_button_set_image_position(GTK_BUTTON(btn_logout), GTK_POS_LEFT);
-    gtk_widget_set_tooltip_text(btn_logout, "Apagar | Reiniciar | Suspender | Cerrar sesión");
+    gtk_widget_set_tooltip_text(btn_logout, _("Shutdown | Restart | Suspend | Logout"));
     g_signal_connect(btn_logout, "clicked", G_CALLBACK(on_logout_clicked), m);
     gtk_box_pack_start(GTK_BOX(bottom_bar), btn_logout, FALSE, FALSE, 0);
 
     /* Espacio y buscador */
-    GtkWidget *search_label = gtk_label_new("Buscar:");
+    GtkWidget *search_label = gtk_label_new(_("Search:"));
     gtk_box_pack_start(GTK_BOX(bottom_bar), search_label, FALSE, FALSE, 4);
 
     m->search = gtk_entry_new();
@@ -1732,17 +1762,17 @@ static void unhide_app(GtkButton *button, gpointer user_data)
     ModernMenu *m = (ModernMenu *)user_data;
     const char *app_id = (const char *)g_object_get_data(G_OBJECT(button), "app-id");
 
-    g_print("unhide_app: Iniciando para app_id=%s\n", app_id ? app_id : "NULL");
+    g_print(_("unhide_app: Starting for app_id=%s\n"), app_id ? app_id : "NULL");
 
     if (!app_id || !m) {
-        g_print("unhide_app: app_id o m es NULL, abortando\n");
+        g_print(_("unhide_app: app_id or m is NULL, aborting\n"));
         return;
     }
 
     // Buscar en la lista
     for (GSList *l = m->hidden_apps; l; l = l->next) {
         if (g_strcmp0((const char *)l->data, app_id) == 0) {
-            g_print("unhide_app: App encontrada en lista, eliminando...\n");
+            g_print(_("unhide_app: App found in list, removing...\n"));
 
             // Liberar el string
             g_free(l->data);
@@ -1751,17 +1781,17 @@ static void unhide_app(GtkButton *button, gpointer user_data)
             m->hidden_apps = g_slist_delete_link(m->hidden_apps, l);
 
             // Guardar el archivo actualizado
-            g_print("unhide_app: Guardando archivo...\n");
+            g_print(_("unhide_app: Saving file...\n"));
             save_hidden_apps(m);
-            g_print("unhide_app: Archivo guardado\n");
+            g_print(_("unhide_app: File saved\n"));
 
             // Eliminar visualmente la fila del diálogo
             GtkWidget *hbox = gtk_widget_get_parent(GTK_WIDGET(button));
             if (hbox) {
-                g_print("unhide_app: Destruyendo widget visual\n");
+                g_print(_("unhide_app: Destroying visual widget\n"));
                 gtk_widget_destroy(hbox);
             }
-            g_print("unhide_app: Completado exitosamente\n");
+            g_print(_("unhide_app: Completed successfully\n"));
             break;
         }
     }
@@ -1777,13 +1807,13 @@ static void on_manage_hidden_button_clicked(GtkButton *button, gpointer user_dat
                                                    GTK_DIALOG_MODAL,
                                                    GTK_MESSAGE_INFO,
                                                    GTK_BUTTONS_OK,
-                                                   "No hay aplicaciones ocultas");
+                                                   _("No hidden applications"));
         gtk_dialog_run(GTK_DIALOG(dialog));
         gtk_widget_destroy(dialog);
         return;
     }
 
-    GtkWidget *dialog = gtk_dialog_new_with_buttons("Aplicaciones Ocultas",
+    GtkWidget *dialog = gtk_dialog_new_with_buttons(_("Hidden Applications"),
                                                     NULL,
                                                     GTK_DIALOG_MODAL,
                                                     GTK_STOCK_CLOSE,
@@ -1838,7 +1868,7 @@ static void on_manage_hidden_button_clicked(GtkButton *button, gpointer user_dat
         gtk_box_pack_start(GTK_BOX(hbox), label, TRUE, TRUE, 5);
 
         // Botón para mostrar
-        GtkWidget *btn = gtk_button_new_with_label("Mostrar");
+        GtkWidget *btn = gtk_button_new_with_label(_("Show"));
         g_object_set_data_full(G_OBJECT(btn), "app-id", g_strdup(hidden_id), g_free);
         g_signal_connect(btn, "clicked", G_CALLBACK(unhide_app), m);
         gtk_box_pack_start(GTK_BOX(hbox), btn, FALSE, FALSE, 5);
@@ -1896,10 +1926,10 @@ static GtkWidget *modernmenu_config(LXPanel *panel, GtkWidget *p)
     GtkWidget *hidden_box = gtk_hbox_new(FALSE, 5);
     gtk_box_pack_start(GTK_BOX(content), hidden_box, FALSE, FALSE, 5);
 
-    GtkWidget *hidden_label = gtk_label_new("Aplicaciones ocultas:");
+    GtkWidget *hidden_label = gtk_label_new(_("Hidden applications:"));
     gtk_box_pack_start(GTK_BOX(hidden_box), hidden_label, FALSE, FALSE, 5);
 
-    GtkWidget *hidden_button = gtk_button_new_with_label("Gestionar");
+    GtkWidget *hidden_button = gtk_button_new_with_label(_("Manage"));
     gtk_box_pack_start(GTK_BOX(hidden_box), hidden_button, FALSE, FALSE, 5);
     g_signal_connect(hidden_button, "clicked", G_CALLBACK(on_manage_hidden_button_clicked), m);
 
@@ -1909,8 +1939,8 @@ static GtkWidget *modernmenu_config(LXPanel *panel, GtkWidget *p)
 }
 
 LXPanelPluginInit fm_module_init_lxpanel_gtk = {
-    .name = "Menú moderno",
-    .description = "Menu de aplicaciones moderno con busqueda y favoritos incluidos",
+    .name = N_("Modern menu"),
+    .description = N_("Modern applications menu with search and favorites included"),
     .new_instance = modernmenu_constructor,
     .config = modernmenu_config
 };

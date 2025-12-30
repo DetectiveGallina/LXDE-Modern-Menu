@@ -1,0 +1,278 @@
+# Portuguese (Brazil) translations for modernmenu
+msgid ""
+msgstr ""
+"Project-Id-Version: modernmenu 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: $(date)\n"
+"PO-Revision-Date: $(date)\n"
+"Last-Translator: DetectiveGallina <facundogodoyrentero@gmail.com>\n"
+"Language-Team: Portuguese\n"
+"Language: pt\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+
+#: src/modern_menu.c:78
+msgid "No MenuCacheItem associated with the button"
+msgstr "Nenhum MenuCacheItem associado ao botão"
+
+#: src/modern_menu.c:84
+msgid "Could not get .desktop file from the item"
+msgstr "Não foi possível obter o arquivo .desktop do item"
+
+#: src/modern_menu.c:87
+#, c-format
+msgid "Attempting to launch: %s\n"
+msgstr "Tentando iniciar: %s\n"
+
+#: src/modern_menu.c:100
+#, c-format
+msgid "Error launching '%s': %s"
+msgstr "Erro ao iniciar '%s': %s"
+
+#: src/modern_menu.c:103
+msgid "Application launched successfully\n"
+msgstr "Aplicação iniciada com sucesso\n"
+
+#: src/modern_menu.c:113
+#, c-format
+msgid "Could not create GDesktopAppInfo from file '%s'"
+msgstr "Não foi possível criar GDesktopAppInfo do arquivo '%s'"
+
+#: src/modern_menu.c:143
+#, c-format
+msgid "Favorites loaded: %d\n"
+msgstr "Favoritos carregados: %d\n"
+
+#: src/modern_menu.c:156
+#, c-format
+msgid "Favorites saved: %d\n"
+msgstr "Favoritos salvos: %d\n"
+
+#: src/modern_menu.c:204
+msgid "Remove from Favorites"
+msgstr "Remover dos Favoritos"
+
+#: src/modern_menu.c:206
+msgid "Add to Favorites"
+msgstr "Adicionar aos Favoritos"
+
+#: src/modern_menu.c:228 src/modern_menu.c:649
+msgid "Desktop"
+msgstr "Área de Trabalho"
+
+#: src/modern_menu.c:239
+msgid "The shortcut already exists on the desktop."
+msgstr "O atalho já existe na área de trabalho."
+
+#: src/modern_menu.c:251
+#, c-format
+msgid "Error copying to desktop: %s"
+msgstr "Erro ao copiar para a área de trabalho: %s"
+
+#: src/modern_menu.c:257
+msgid "Added to desktop"
+msgstr "Adicionado à área de trabalho"
+
+#: src/modern_menu.c:279
+msgid "Error"
+msgstr "Erro"
+
+#: src/modern_menu.c:293
+msgid "Could not load .desktop file."
+msgstr "Não foi possível carregar o arquivo .desktop."
+
+#: src/modern_menu.c:303
+msgid "The .desktop file does not have a valid 'Exec' field."
+msgstr "O arquivo .desktop não tem um campo 'Exec' válido."
+
+#: src/modern_menu.c:338
+msgid "Could not determine the executable from the .desktop file."
+msgstr "Não foi possível determinar o executável do arquivo .desktop."
+
+#: src/modern_menu.c:361
+msgid "No compatible package manager detected (dpkg or pacman)."
+msgstr "Nenhum gerenciador de pacotes compatível detectado (dpkg ou pacman)."
+
+#: src/modern_menu.c:371
+msgid "Do you want to remove the package associated with this application?"
+msgstr "Você deseja remover o pacote associado a esta aplicação?"
+
+#: src/modern_menu.c:372
+msgid "Confirm removal"
+msgstr "Confirmar remoção"
+
+#: src/modern_menu.c:413
+msgid "Could not determine which package this application belongs to."
+msgstr "Não foi possível determinar a qual pacote esta aplicação pertence."
+
+#: src/modern_menu.c:447
+msgid "Could not find a method to request authentication (pkexec, sudo -A)."
+msgstr "Não foi possível encontrar um método para solicitar autenticação (pkexec, sudo -A)."
+
+#: src/modern_menu.c:460
+msgid ""
+"Could not remove the package. Check permissions or authentication method."
+msgstr "Não foi possível remover o pacote. Verifique as permissões ou o método de autenticação."
+
+#: src/modern_menu.c:490
+msgid "Could not create FmFileInfo for the menu item"
+msgstr "Não foi possível criar FmFileInfo para o item do menu"
+
+#: src/modern_menu.c:544
+#, c-format
+msgid "# Hidden applications for Modern Menu\n"
+msgstr "# Aplicações ocultas para Modern Menu\n"
+
+#: src/modern_menu.c:630
+msgid "Quitar de Favoritos"
+msgstr "Remover dos Favoritos"
+
+#: src/modern_menu.c:630
+msgid "Agregar a Favoritos"
+msgstr "Adicionar aos Favoritos"
+
+#: src/modern_menu.c:638
+msgid "Show application"
+msgstr "Mostrar aplicação"
+
+#: src/modern_menu.c:638
+msgid "Hide application"
+msgstr "Ocultar aplicação"
+
+#: src/modern_menu.c:659
+msgid "Add to Desktop"
+msgstr "Adicionar à Área de Trabalho"
+
+#: src/modern_menu.c:676
+msgid "Remove package"
+msgstr "Remover pacote"
+
+#: src/modern_menu.c:688
+msgid "Properties"
+msgstr "Propriedades"
+
+#: src/modern_menu.c:807
+msgid "There's no favorite applications"
+msgstr "Não há aplicações favoritas"
+
+#: src/modern_menu.c:940
+msgid "No applications"
+msgstr "Nenhuma aplicação"
+
+#: src/modern_menu.c:949 src/modern_menu.c:1032
+msgid "No applications in this category"
+msgstr "Nenhuma aplicação nesta categoria"
+
+#: src/modern_menu.c:1157
+#, c-format
+msgid "Total apps in all_apps: %d\n"
+msgstr "Total de aplicações em all_apps: %d\n"
+
+#: src/modern_menu.c:1242
+msgid "No matching applications found"
+msgstr "Nenhuma aplicação correspondente encontrada"
+
+#: src/modern_menu.c:1457
+#, c-format
+msgid "Non-square image: %dx%d -> %dx%d (scale: %.2f)\n"
+msgstr "Imagem não quadrada: %dx%d -> %dx%d (escala: %.2f)\n"
+
+#: src/modern_menu.c:1512
+#, c-format
+msgid "Widget adjusted: %dx%d px\n"
+msgstr "Widget ajustado: %dx%d px\n"
+
+#: src/modern_menu.c:1628
+msgid "Applications Menu"
+msgstr "Menu de Aplicações"
+
+#: src/modern_menu.c:1673
+msgid "★ Favorites"
+msgstr "★ Favoritos"
+
+#: src/modern_menu.c:1675
+msgid "Favorite applications"
+msgstr "Aplicações favoritas"
+
+#: src/modern_menu.c:1689
+msgid "Category"
+msgstr "Categoria"
+
+#: src/modern_menu.c:1721
+msgid "Exit"
+msgstr "Sair"
+
+#: src/modern_menu.c:1723
+msgid "Shutdown | Restart | Suspend | Logout"
+msgstr "Desligar | Reiniciar | Suspender | Sair"
+
+#: src/modern_menu.c:1728
+msgid "Search:"
+msgstr "Buscar:"
+
+#: src/modern_menu.c:1765
+#, c-format
+msgid "unhide_app: Starting for app_id=%s\n"
+msgstr "unhide_app: Iniciando para app_id=%s\n"
+
+#: src/modern_menu.c:1768
+msgid "unhide_app: app_id or m is NULL, aborting\n"
+msgstr "unhide_app: app_id ou m é NULL, abortando\n"
+
+#: src/modern_menu.c:1775
+msgid "unhide_app: App found in list, removing...\n"
+msgstr "unhide_app: Aplicação encontrada na lista, removendo...\n"
+
+#: src/modern_menu.c:1784
+msgid "unhide_app: Saving file...\n"
+msgstr "unhide_app: Salvando arquivo...\n"
+
+#: src/modern_menu.c:1786
+msgid "unhide_app: File saved\n"
+msgstr "unhide_app: Arquivo salvo\n"
+
+#: src/modern_menu.c:1791
+msgid "unhide_app: Destroying visual widget\n"
+msgstr "unhide_app: Destruindo widget visual\n"
+
+#: src/modern_menu.c:1794
+msgid "unhide_app: Completed successfully\n"
+msgstr "unhide_app: Concluído com sucesso\n"
+
+#: src/modern_menu.c:1810
+msgid "No hidden applications"
+msgstr "Nenhuma aplicação oculta"
+
+#: src/modern_menu.c:1816
+msgid "Hidden Applications"
+msgstr "Aplicações Ocultas"
+
+#: src/modern_menu.c:1871
+msgid "Show"
+msgstr "Mostrar"
+
+#: src/modern_menu.c:1913
+msgid "Modern Menu"
+msgstr "Menu Moderno"
+
+#: src/modern_menu.c:1915
+msgid "Icon"
+msgstr "Ícone"
+
+#: src/modern_menu.c:1929
+msgid "Hidden applications:"
+msgstr "Aplicações ocultas:"
+
+#: src/modern_menu.c:1932
+msgid "Manage"
+msgstr "Gerenciar"
+
+#: src/modern_menu.c:1942
+msgid "Modern menu"
+msgstr "Menu moderno"
+
+#: src/modern_menu.c:1943
+msgid "Modern applications menu with search and favorites included"
+msgstr "Menu moderno de aplicações com busca e favoritos incluídos"
