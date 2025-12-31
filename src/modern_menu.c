@@ -627,7 +627,7 @@ static void show_context_menu(GtkWidget *app_button, ModernMenu *m, GdkEventButt
 
     /* ===== Agregar/Quitar de Favoritos ===== */
     GtkWidget *fav_item = gtk_menu_item_new_with_label(
-        is_fav ? _("Quitar de Favoritos") : _("Agregar a Favoritos")
+        is_fav ? _("Remove from Favorites") : _("Add to Favorites")
     );
     gtk_menu_shell_append(GTK_MENU_SHELL(menu), fav_item);
     gtk_widget_show(fav_item);
