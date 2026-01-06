@@ -40,7 +40,11 @@ Esta es una muestra de cómo se puede ver el menú si se tiene instalado un tema
 
 Para sistemas basados en Debian puedes usar directamente el archivo .deb que corresponda para tu arquitectura. Estos archivos se encuentran en el apartado de releases del repositorio.
 
-Una vez descargado usa el siguiente comando para instalarlo en tu sistema:
+Una vez descargado, usa el siguiente comando en el  mismo directorio para instalarlo en tu sistema:
+
+```bash
+sudo dpkg -i modernmenu*.deb
+```
 
 En caso de desear eliminarlo puede hacerlo o bien con ```dpkg -r modernmenu```, o bien con ```apt remove modernmenu```, ambas deberían de funcionar correctamente.
 
