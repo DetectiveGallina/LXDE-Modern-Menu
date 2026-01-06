@@ -40,7 +40,11 @@ This is a sample of how the menu can look if you have a GTK theme installed, suc
 
 For Debian-based systems you can directly use the appropriate .deb file for your architecture. These files can be found in the repository's releases section.
 
-Once downloaded, use the following command to install it on your system:
+Once downloaded, use the following command in the same directory to install it on your system:
+
+```bash
+sudo dpkg -i modernmenu*.deb
+```
 
 If you wish to remove it, you can do so either with ```dpkg -r modernmenu```, or with ```apt remove modernmenu```, both should work correctly.
 
