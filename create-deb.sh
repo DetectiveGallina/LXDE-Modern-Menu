@@ -135,12 +135,12 @@ find_plugins_dir() {
         fi
     else
         # Orden de búsqueda para 32 bits
-        if [ -d "/usr/lib/lxpanel/plugins" ]; then
-            echo "/usr/lib/lxpanel/plugins"
-        elif [ -d "/usr/lib/i386-linux-gnu/lxpanel/plugins" ]; then
+        if [ -d "/usr/lib/i386-linux-gnu/lxpanel/plugins" ]; then
             echo "/usr/lib/i386-linux-gnu/lxpanel/plugins"
         elif [ -d "/usr/lib32/lxpanel/plugins" ]; then
             echo "/usr/lib32/lxpanel/plugins"
+        elif [ -d "/usr/lib/lxpanel/plugins" ]; then
+            echo "/usr/lib/lxpanel/plugins"
         else
             mkdir -p "/usr/lib/lxpanel/plugins"
             echo "/usr/lib/lxpanel/plugins"
