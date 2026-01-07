@@ -99,6 +99,8 @@ create_deb() {
     cat > "$package_dir/DEBIAN/control" <<EOF
 Package: ${DEB_NAME}
 Version: ${DEB_VERSION}
+Priority: optional
+Section: lxde
 Architecture: ${arch}
 Maintainer: ${DEB_MAINTAINER}
 Installed-Size: ${installed_size}
